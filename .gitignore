@@ -1,0 +1,7 @@
+node_modules/
+shot-*.png
+
+# The Firebase config is public by design and SHOULD be committed — the
+# security rules are what protect the data. It is listed here only as a
+# reminder of that, not as an exclusion.
+# firebase.config.json

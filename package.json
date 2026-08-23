@@ -1,0 +1,26 @@
+{
+  "name": "flight-options",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trip flight tracker published as a Claude Artifact",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:web": "node build-web.mjs",
+    "icons": "node make-icons.mjs",
+    "test": "node test.mjs",
+    "test:artifact": "node check.mjs",
+    "test:web": "node check-web.mjs",
+    "shots": "node shots.mjs",
+    "all": "npm run build && npm run build:web && npm test && npm run test:artifact && npm run test:web"
+  },
+  "dependencies": {
+    "firebase": "^12.18.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "playwright": "^1.49.0"
+  }
+}

@@ -1,0 +1,44 @@
+rules_version = '2';
+
+/* ============================================================================
+   Trip Desk — who may touch the trips.
+
+   The Firebase config shipped in the built page is PUBLIC and is not a
+   credential; it only names the project. This file is the actual lock. Nothing
+   is readable or writable without being signed in as one of the accounts
+   listed below.
+
+   To add someone: sign in as them once, copy their UID from
+   Firebase console → Authentication → Users, and add it to MEMBERS.
+   ========================================================================== */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function members() {
+      return [
+        "REPLACE_WITH_YOUR_UID"
+        // , "SECOND_PERSON_UID"
+      ];
+    }
+
+    function isMember() {
+      return request.auth != null && request.auth.uid in members();
+    }
+
+    /* One shared workspace: everyone on the list sees the same trips, which is
+       the point when two people are planning one holiday. */
+    match /trips/{tripId} {
+      allow read, write: if isMember();
+    }
+
+    match /meta/{docId} {
+      allow read, write: if isMember();
+    }
+
+    /* Anything else is nobody's business. */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
