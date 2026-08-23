@@ -21,8 +21,21 @@ const ROOT = process.cwd();
 let config = null;
 try {
   config = JSON.parse(await readFile("firebase.config.json", "utf8"));
-} catch {
-  console.warn("! firebase.config.json missing — building an unconfigured shell.");
+} catch (err) {
+  if (err.code === "ENOENT") {
+    /* A legitimate mode: the artifact build needs no Firebase at all. */
+    console.warn("! firebase.config.json missing — building an unconfigured shell.");
+  } else {
+    /* Not a mode, a mistake. Failing loudly here is the whole point: a syntax
+       error used to land in the same branch as a missing file, so the build
+       succeeded and shipped an app with no backend. The Firebase console hands
+       you a JavaScript object literal, whose keys are unquoted and therefore
+       not JSON. */
+    console.error(`✗ firebase.config.json is present but not valid JSON: ${err.message}`);
+    console.error("  The console gives you a JS object literal — quote the keys.");
+    console.error("  See firebase.config.example.json for the exact shape.");
+    process.exit(1);
+  }
 }
 
 /* Point `./backend.js` at Firestore for this target only. */
