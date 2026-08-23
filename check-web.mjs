@@ -43,10 +43,24 @@ console.log("\nhosted build boots");
 check("the Firebase bundle loads without throwing", errs.length === 0, errs);
 check("it renders the sign-in gate, not the desk", (await p.locator(".signin").count()) === 1);
 check("no trips leak before sign-in", (await p.locator(".tripcard").count()) === 0);
-check("an unconfigured build says so plainly",
-  /no Firebase project/i.test(await p.textContent(".signin")), await p.textContent(".signin"));
-check("and disables the button rather than failing on click",
-  await p.evaluate(() => document.querySelector(".signin .btn-solid").disabled));
+/* The gate's copy depends on whether this build received a Firebase config,
+   and both states are worth asserting. Detect which one we are looking at from
+   the same file the build itself read, rather than assuming — this test used to
+   assume "unconfigured" and quietly went stale the day the project was
+   configured. */
+let configured = false;
+try { JSON.parse(await readFile("firebase.config.json", "utf8")); configured = true; } catch {}
+
+const gate = await p.textContent(".signin");
+const disabled = await p.evaluate(() => document.querySelector(".signin .btn-solid").disabled);
+
+if (configured) {
+  check("a configured build offers a live sign-in", !/no Firebase project/i.test(gate), gate);
+  check("and the button is not disabled", disabled === false);
+} else {
+  check("an unconfigured build says so plainly", /no Firebase project/i.test(gate), gate);
+  check("and disables the button rather than failing on click", disabled === true);
+}
 
 console.log("\npwa");
 const man = JSON.parse(await (await fetch("http://localhost:8833/manifest.webmanifest")).text());
