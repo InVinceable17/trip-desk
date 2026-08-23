@@ -1,7 +1,10 @@
 import { chromium } from "playwright";
 import { serve } from "./serve.mjs";
 
-const CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+/* Playwright finds its own browser. PW_CHROME overrides that for sandboxes
+   that keep browsers outside the standard cache — which is where the absolute
+   Linux path that used to live here came from. */
+const CHROME = process.env.PW_CHROME;
 const errs = [];
 let fails = 0;
 const check = (name, cond, extra) => {
@@ -22,7 +25,7 @@ const V1 = JSON.stringify({
 });
 
 const server = await serve(8811, { "data/state.json": V1 });
-const b = await chromium.launch({ executablePath: CHROME });
+const b = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
 const p = await b.newPage({ viewport: { width: 1280, height: 1500 } });
 p.on("pageerror", (e) => errs.push("pageerror: " + e.message));
 p.on("console", (m) => { const t = m.text(); if (m.type() === "error" && !/404|Failed to load resource/.test(t)) errs.push("console: " + t); });

@@ -6,7 +6,10 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-const CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+/* Playwright finds its own browser. PW_CHROME overrides that for sandboxes
+   that keep browsers outside the standard cache — which is where the absolute
+   Linux path that used to live here came from. */
+const CHROME = process.env.PW_CHROME;
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".png": "image/png", ".webmanifest": "application/manifest+json" };
 
 const server = await new Promise((r) => {
@@ -28,7 +31,7 @@ const check = (n, c, extra) => {
   else { console.log(" FAIL " + n + (extra ? "\n       " + JSON.stringify(extra).slice(0, 300) : "")); fails++; }
 };
 
-const b = await chromium.launch({ executablePath: CHROME });
+const b = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
 const p = await b.newPage({ viewport: { width: 1100, height: 900 } });
 p.on("pageerror", (e) => errs.push("pageerror: " + e.message));
 p.on("console", (m) => { if (m.type() === "error" && !/favicon|sw\.js|ServiceWorker/i.test(m.text())) errs.push("console: " + m.text()); });
