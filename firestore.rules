@@ -17,7 +17,7 @@ service cloud.firestore {
 
     function members() {
       return [
-        "REPLACE_WITH_YOUR_UID"
+        "vlc0HIRUYuSuyRRKBjAvlXVbMwc2"
         // , "SECOND_PERSON_UID"
       ];
     }
