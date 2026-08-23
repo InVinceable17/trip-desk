@@ -1,0 +1,11 @@
+# Normalise to LF in the repository and in working copies.
+#
+# Without this, Git on Windows checks these files out as CRLF. The service
+# worker caches the app shell under a hash of the built HTML (build-web.mjs),
+# deliberately so that a rebuild changing nothing leaves the cache alone —
+# line-ending drift between machines would defeat that and needlessly
+# invalidate every installed copy.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
