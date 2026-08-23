@@ -20,10 +20,15 @@ npm test             # 121 unit checks, fast, no browser
 npm run all          # both builds + every suite
 ```
 
-`test:artifact` and `test:web` drive Playwright and need a browser installed.
-They currently fail on this machine — `PLAYWRIGHT_BROWSERS_PATH` points at
-`/opt/pw-browsers/...`, a Linux path — so they are unverified, not passing.
-`npm test` is the one that actually runs.
+`test:artifact` and `test:web` drive Playwright. Run `npx playwright install
+chromium` once and `npm run all` passes end to end. Set `PW_CHROME` to an
+executable path if the browser lives outside Playwright's own cache.
+
+`check-web.mjs` asserts the sign-in gate in *both* states, reading
+`firebase.config.json` the same way the build does. It previously assumed the
+build was unconfigured, and went stale the day the project got a config — a
+failure nobody saw, because a hardcoded Linux browser path meant the suite had
+never run here at all.
 
 ## Traps
 
