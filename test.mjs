@@ -2,6 +2,9 @@
 import assert from "node:assert";
 import { parseFares, parseFareBlocks, parseSearchRows, parseFlightNo, parsePaste } from "./src/parsers.js";
 import { searchUrl, fareUrl, DEFAULT_CONFIG } from "./src/flights.js";
+import { parseDoc, parseDocText, parseDocJson, parseDateRange, parseOneDate, importPrompt } from "./src/doc-parse.js";
+import { applyDoc, driftList, compare, acceptDoc, keepMine, detach, fieldValue } from "./src/doc-sync.js";
+
 
 let pass = 0;
 const ok = (name, fn) => { try { fn(); pass++; console.log("  ok  " + name); } catch (e) { console.log(" FAIL " + name + "\n       " + e.message); process.exitCode = 1; } };
@@ -848,6 +851,178 @@ ok("a stop's arrival and departure dates are its span", () => {
   const sp = segmentSpans(lockedTrip())[1];
   assert.equal(sp.startDate, "2026-10-16");   // arrive Florence
   assert.equal(sp.endDate, "2026-10-19");     // depart Florence
+});
+
+
+/* ==================================================== the doc as a source */
+
+const DOC = `Italy 2026
+Oct 12 - Oct 23, 2026
+2 travellers
+
+Rome (8 nights)
+Hotel: Hotel Artemide - https://example.com/artemide - conf ABC12345 - $1,840
+
+Florence (3 nights)
+Hotel: Palazzo Guadagni
+
+Oct 12 - Rome
+- Land at FCO, drop bags
+- Dinner near Trastevere, $60
+
+Oct 14
+- Borghese Gallery 9:00 tickets https://example.com/borghese
+`;
+
+ok("a date range reads with the month written once", () => {
+  assert.deepEqual(parseDateRange("Oct 12-23, 2026"), { start: "2026-10-12", end: "2026-10-23" });
+});
+ok("a date range reads with both months written", () => {
+  assert.deepEqual(parseDateRange("October 12 to October 23, 2026"), { start: "2026-10-12", end: "2026-10-23" });
+});
+ok("a bare date resolves against the trip it is being read into", () => {
+  assert.equal(parseOneDate("Oct 14", "2026-10-12"), "2026-10-14");
+});
+ok("the doc's title becomes the trip name", () => {
+  assert.equal(parseDocText(DOC).name, "Italy 2026");
+});
+ok("cities and their nights come out in the doc's order", () => {
+  assert.deepEqual(parseDocText(DOC).segments, [
+    { city: "Rome", nights: 8 }, { city: "Florence", nights: 3 },
+  ]);
+});
+ok("a hotel line is split into name, link, ref and total", () => {
+  const s = parseDocText(DOC).stays[0];
+  assert.equal(s.name, "Hotel Artemide");
+  assert.equal(s.url, "https://example.com/artemide");
+  assert.equal(s.ref, "ABC12345");
+  assert.equal(s.total, "1840");
+  assert.equal(s.city, "Rome");
+});
+ok("bullets land on the day heading above them", () => {
+  const d = parseDocText(DOC).days;
+  assert.deepEqual(d["2026-10-12"].items.map((i) => i.title), ["Land at FCO, drop bags", "Dinner near Trastevere"]);
+  assert.equal(d["2026-10-12"].items[1].cost, "60");
+  assert.equal(d["2026-10-14"].items[0].time, "9:00");
+});
+ok("travellers are read from prose", () => {
+  assert.equal(parseDocText(DOC).travelers, 2);
+});
+ok("a line the parser does not understand is reported, not guessed at", () => {
+  const p = parseDocText("Trip\nask Marco about the boat thing");
+  assert.deepEqual(p.unparsed, ["ask Marco about the boat thing"]);
+  assert.equal(p.segments.length, 0);
+});
+ok("JSON from an LLM parses into the same shape", () => {
+  const p = parseDoc('```json\n{"name":"Italy","segments":[{"city":"Rome","nights":8}]}\n```');
+  assert.equal(p.name, "Italy");
+  assert.deepEqual(p.segments, [{ city: "Rome", nights: 8 }]);
+});
+ok("JSON that is not a trip fails loudly rather than importing nothing", () => {
+  assert.throws(() => parseDocJson('{"unrelated":1}'), /nothing in it matched/);
+});
+ok("the import prompt carries the trip's existing names so nothing duplicates", () => {
+  const t = blankTrip("Italy");
+  t.segments = [{ id: "s1", city: "Rome", nights: 8, locked: false }];
+  assert.match(importPrompt(t), /cities: Rome/);
+});
+
+/* ---------------------------------------------------------------- syncing */
+
+const imported = () => applyDoc(blankTrip("Untitled"), parseDocText(DOC), { now: "2026-08-24T00:00:00Z", by: "Vince" }).trip;
+
+ok("importing fills the trip and records where it came from", () => {
+  const t = imported();
+  assert.equal(t.name, "Italy 2026");
+  assert.equal(t.segments.length, 2);
+  assert.equal(t.stays[0].name, "Hotel Artemide");
+  assert.equal(t.source.kind, "gdoc");
+  assert.equal(t.source.syncedBy, "Vince");
+});
+ok("a hotel is tied to the city it was written under", () => {
+  const t = imported();
+  const rome = t.segments.find((s) => s.city === "Rome");
+  assert.equal(t.stays[0].segmentId, rome.id);
+});
+ok("a freshly imported trip has no drift", () => {
+  assert.deepEqual(driftList(imported()), []);
+});
+ok("editing an imported field here shows as drift against the doc", () => {
+  const t = imported();
+  t.stays = t.stays.map((s, i) => (i === 0 ? { ...s, name: "Hotel Nazionale" } : s));
+  const d = driftList(t);
+  assert.equal(d.length, 1);
+  assert.equal(d[0].label, "Hotel");
+  assert.equal(d[0].docValue, "Hotel Artemide");
+  assert.equal(d[0].tripValue, "Hotel Nazionale");
+});
+ok("taking the doc's value clears that drift", () => {
+  let t = imported();
+  t.stays = t.stays.map((s, i) => (i === 0 ? { ...s, name: "Hotel Nazionale" } : s));
+  t = acceptDoc(t, driftList(t)[0].path);
+  assert.equal(t.stays[0].name, "Hotel Artemide");
+  assert.deepEqual(driftList(t), []);
+});
+ok("keeping ours clears the drift without changing the trip", () => {
+  let t = imported();
+  t.stays = t.stays.map((s, i) => (i === 0 ? { ...s, name: "Hotel Nazionale" } : s));
+  t = keepMine(t, driftList(t)[0].path);
+  assert.equal(t.stays[0].name, "Hotel Nazionale");
+  assert.deepEqual(driftList(t), []);
+});
+ok("re-importing the same doc changes nothing and adds nothing", () => {
+  const once = imported();
+  const twice = applyDoc(once, parseDocText(DOC), { now: "2026-08-25T00:00:00Z" });
+  assert.equal(twice.added, 0);
+  assert.equal(twice.updated, 0);
+  assert.equal(twice.trip.segments.length, 2);
+  assert.equal(twice.trip.stays.length, 2);
+});
+ok("a city renamed in the doc updates rather than duplicating a stop", () => {
+  const once = imported();
+  const p = parseDocText(DOC.replace("Florence (3 nights)", "Florence (5 nights)"));
+  const { trip } = applyDoc(once, p);
+  assert.equal(trip.segments.length, 2);
+  assert.equal(trip.segments.find((s) => s.city === "Florence").nights, 5);
+});
+ok("record mode leaves a locally edited field alone but still tracks the doc", () => {
+  let t = imported();
+  t.stays = t.stays.map((s, i) => (i === 0 ? { ...s, total: "2000" } : s));
+  const p = parseDocText(DOC.replace("$1,840", "$1,950"));
+  const r = applyDoc(t, p, { mode: "record" });
+  assert.equal(r.trip.stays[0].total, "2000");
+  assert.equal(r.kept, 1);
+  assert.equal(driftList(r.trip).find((x) => x.path.endsWith(".total")).docValue, "1950");
+});
+ok("a hotel renamed in the doc reads as a different hotel, not a rename", () => {
+  const once = imported();
+  const p = parseDocText(DOC.replace("Hotel Artemide", "Hotel Quirinale"));
+  const { trip } = applyDoc(once, p);
+  assert.equal(trip.stays.length, 3);
+  assert.ok(trip.stays.some((s) => s.name === "Hotel Artemide"));
+  assert.ok(trip.stays.some((s) => s.name === "Hotel Quirinale"));
+});
+ok("day plans are additive - a line dropped from the doc keeps its booking", () => {
+  const once = imported();
+  const p = parseDocText(DOC.replace("- Land at FCO, drop bags\n", ""));
+  const { trip } = applyDoc(once, p);
+  assert.equal(trip.days["2026-10-12"].items.length, 2);
+});
+ok("detaching forgets the doc and leaves the trip standing", () => {
+  const t = detach(imported());
+  assert.equal(t.source.kind, "");
+  assert.equal(t.segments.length, 2);
+  assert.deepEqual(driftList(t), []);
+});
+ok("a field whose thing was deleted here is surfaced, not dropped", () => {
+  const t = { ...imported() };
+  t.stays = [];
+  assert.ok(compare(t).some((r) => r.state === "orphan"));
+});
+ok("an old trip with no source block still opens", () => {
+  const t = blankTrip("Old");
+  delete t.source;
+  assert.deepEqual(driftList(hydrateTrip(t)), []);
 });
 
 console.log(`\n${pass} checks passed\n`);

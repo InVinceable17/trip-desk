@@ -16,7 +16,7 @@ claude.ai and a hosted build for GitHub Pages. `README.md` covers the app,
 ```
 npm run build:web    # -> docs/   (hosted, Firestore-backed)
 npm run build        # -> dist/   (artifact, artifact-file-backed)
-npm test             # 121 unit checks, fast, no browser
+npm test             # 147 unit checks, fast, no browser
 npm run all          # both builds + every suite
 ```
 
@@ -29,6 +29,46 @@ executable path if the browser lives outside Playwright's own cache.
 build was unconfigured, and went stale the day the project got a config — a
 failure nobody saw, because a hardcoded Linux browser path meant the suite had
 never run here at all.
+
+## The doc behind a trip
+
+A trip can be a structured view of a Google Doc somebody else actually writes
+in. `src/doc-parse.js` reads a planning doc into a patch; `src/doc-sync.js`
+folds that patch onto a trip and remembers what the doc said, field by field,
+in `trip.source.fields`. `src/views/Source.jsx` is the bar under the header and
+the panel it opens.
+
+**Google will not let the doc be edited inside the page.** `docs.google.com`
+serves `X-Frame-Options: SAMEORIGIN` on every route, so the editor cannot be
+framed. `/preview` and published `/pub` are framable but read-only. The app
+links out; it does not embed.
+
+**The page cannot fetch the doc either.** Google's export and publish endpoints
+send no `Access-Control-Allow-Origin`, so there is no client-side-only sync. The
+routes that do work are an Apps Script bound to the doc pushing into Firestore
+with a service account, or pasting the text in. Today it is paste.
+
+**Import never silently overwrites.** Every tracked field records the doc's
+value alongside the trip's, so the two can disagree out loud — that is what the
+"n differ" badge counts, and what `driftList()` returns. A line the parser does
+not recognise goes into `unparsed` and is shown, never guessed at.
+
+**A hotel renamed in the doc reads as a different hotel.** The doc has no ids,
+so a rename and a replacement are the same edit. Both survive; you delete the
+stale one. This is deliberate — see the comment above `key()` in `doc-sync.js`.
+
+## Phone
+
+Below 768px `page.html` restyles the app: system font for prose, mono kept for
+codes and money, 44px targets, 16px inputs (anything smaller makes iOS zoom on
+focus and never zoom back), and the phase stepper fixed to the bottom as a tab
+bar. Above that breakpoint nothing changed — the Gantt desk is untouched. The
+`:has()` rule that stands the wordmark down when a trip is open has an
+`@supports not` fallback.
+
+`npm run shots` also had the hardcoded Linux browser path, so it had never run
+here either; it now reads `PW_CHROME` like the other two. The phone shots are
+`shot-phone-*.png`.
 
 ## Traps
 
