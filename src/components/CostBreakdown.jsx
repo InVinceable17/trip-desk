@@ -108,8 +108,8 @@ export default function CostBreakdown({ trip, update, onClose, readOnly }) {
         <div className="row-wrap mt8 center">
           <span className="hint inline">
             {sum.mixed
-              ? `Converted to ${base} with the rates you keep here — no rate service is called, so check them before you trust the total.`
-              : `Everything is in ${base}.`}
+              ? `Converted to ${base} with your own rates — nothing is fetched.`
+              : `All in ${base}.`}
           </span>
           <div className="grow" />
           <Btn className="sm" onClick={() => setRates((v) => !v)}>{rates ? "Hide rates" : "Rates"}</Btn>

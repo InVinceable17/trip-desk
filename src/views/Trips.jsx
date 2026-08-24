@@ -21,22 +21,17 @@ export default function Trips({ trips, order, onOpen, onNew, onDuplicate, onDele
       <div className="toolbar">
         <Btn kind="solid" onClick={onNew} disabled={readOnly}>+ New trip</Btn>
         <div className="grow" />
-        <span className="hint inline">{list.length} trip{list.length === 1 ? "" : "s"} saved</span>
       </div>
 
       {missing && missing.length > 0 && (
         <div className="banner warn">
-          {missing.length} trip{missing.length === 1 ? "" : "s"} couldn't be read from storage. They're
-          still listed in the index — reload, and tell Claude if they stay broken.
+          {missing.length} trip{missing.length === 1 ? "" : "s"} couldn't be read from storage. Try reloading.
         </div>
       )}
 
       {!list.length && (
         <div className="card"><div className="card-body">
-          <div className="empty">
-            No trips yet. Start one and the five phases — dates, flights, cities, stays, days —
-            open up inside it.
-          </div>
+          <div className="empty">No trips yet.</div>
         </div></div>
       )}
 
@@ -89,13 +84,6 @@ export default function Trips({ trips, order, onOpen, onNew, onDuplicate, onDele
         })}
       </div>
 
-      {list.length > 0 && (
-        <div className="legend">
-          <span>phase dots, left to right: {PHASES.map((p) => p.label.toLowerCase()).join(" · ")}</span>
-          <span><i className="dot is-done inline" />done</span>
-          <span><i className="dot is-started inline" />in progress</span>
-        </div>
-      )}
     </div>
   );
 }

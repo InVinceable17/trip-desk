@@ -83,8 +83,8 @@ export default function Backup({ db, onRestore, readOnly }) {
       <Card title="Backups" accent>
         <p className="hint" style={{ marginTop: 0 }}>
           {HOSTED
-            ? "Your trips live in Firestore and follow you between devices. These are the extra copies, in case something goes wrong there."
-            : "Your trips are kept in this artifact and are saved as you work. These are the extra copies, for while we're still changing the app underneath you."}
+            ? "Your trips live in Firestore and follow you between devices. These are the extra copies."
+            : "Your trips are kept in this artifact. These are the extra copies."}
         </p>
 
         <div className="row-wrap mt8 center">
@@ -97,8 +97,7 @@ export default function Backup({ db, onRestore, readOnly }) {
         </div>
         {downloads === null && (
           <div className="banner note tight">
-            This view can't hand you a file — copy the JSON instead. (A published page never writes
-            to your disk without a confirmation, and this view isn't offering one.)
+            This view can't hand you a file — copy the JSON instead.
           </div>
         )}
 
@@ -123,10 +122,9 @@ export default function Backup({ db, onRestore, readOnly }) {
       <Card title="Automatic snapshots"
         right={<span className="muted">{snaps.length} kept in this browser</span>}>
         <p className="hint" style={{ marginTop: 0 }}>
-          Taken every time something saves, capped at 25. They live in this browser only — a
-          different machine won't have them — so they're the fast undo, not the archive.
+          Taken on every save, capped at 25. This browser only — the fast undo, not the archive.
         </p>
-        {!snaps.length && <div className="empty">No snapshots yet. Change something and one appears.</div>}
+        {!snaps.length && <div className="empty">No snapshots yet.</div>}
         {snaps.length > 0 && (
           <div className="snaplist mt8">
             {snaps.map((s) => (

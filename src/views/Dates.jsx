@@ -26,7 +26,7 @@ export default function Dates({ trip, update, readOnly }) {
 
   return (
     <div className="stack">
-      <Card title="The window you're shopping in" accent>
+      <Card title="Window" accent>
         <div className="row-wrap">
           <Field label="Earliest departure" w="0 1 170px">
             <input type="date" value={trip.window.start} disabled={readOnly}
@@ -49,12 +49,9 @@ export default function Dates({ trip, update, readOnly }) {
               onChange={(e) => update((t) => ({ ...t, travelers: Math.max(1, +e.target.value || 1) }))} />
           </Field>
         </div>
-        <p className="hint">
-          A loose range to search within. Nothing here commits you — picking the actual dates is the next step.
-        </p>
       </Card>
 
-      <Card title="Lock the dates">
+      <Card title="Dates">
         {hasWindow ? (
           <>
             <div className="readout">
@@ -73,15 +70,14 @@ export default function Dates({ trip, update, readOnly }) {
                 </>
               ) : (
                 <div className="readout-main muted">
-                  Click a start day on the calendar above, then an end day.
+                  Pick a start and an end day on the calendar.
                 </div>
               )}
             </div>
 
             {(tooShort || tooLong) && (
               <div className="banner note tight">
-                That's {nights} nights — outside the {minNights}–{maxNights} you said you were targeting.
-                Fine if you've changed your mind; the range is only a guide.
+                {nights} nights — outside your {minNights}–{maxNights} target.
               </div>
             )}
 
@@ -89,39 +85,31 @@ export default function Dates({ trip, update, readOnly }) {
               {trip.dates.locked ? (
                 <>
                   <span className="chip st-booked">Locked</span>
-                  <span className="hint inline">
-                    {dayLabel(trip.dates.start)} → {dayLabel(trip.dates.end)} · everything downstream is built on these.
-                  </span>
-                  <Btn onClick={unlock} disabled={readOnly}>Unlock to change</Btn>
+                  <Btn onClick={unlock} disabled={readOnly}>Unlock</Btn>
                 </>
               ) : (
                 <>
                   <Btn kind="solid" onClick={lock} disabled={readOnly || !chosen}>Lock these dates</Btn>
                   <Btn onClick={() => update((t) => ({ ...t, dates: { start: "", end: "", locked: false } }))}
                     disabled={readOnly || !trip.dates.start}>Clear</Btn>
-                  <span className="hint inline">Locking sets the calendar every later phase works from.</span>
                 </>
               )}
             </div>
 
             {!trip.dates.locked && trip.dates.start && dependents > 0 && (
               <div className="banner warn tight">
-                {dependents} thing{dependents === 1 ? "" : "s"} downstream already depend on these dates
-                ({assignedNights(trip.segments)} nights of cities are laid out). Changing the length will leave
-                them to re-balance.
+                {dependents} thing{dependents === 1 ? "" : "s"} downstream depend on these dates
+                — {assignedNights(trip.segments)} nights of cities are laid out.
               </div>
             )}
           </>
         ) : (
-          <div className="empty">Set a window above and the calendar appears at the top of the page.</div>
+          <div className="empty">Set a window above.</div>
         )}
       </Card>
 
-      <Card title="Holidays worth knowing about">
-        <p className="hint">
-          Days off you already get. They come out of the weekday count above — that's all they do.
-        </p>
-        <div className="row-wrap mt8 center">
+      <Card title="Holidays">
+        <div className="row-wrap center">
           <Field label="Add a date" w="0 1 170px">
             <input type="date" value={holiday} disabled={readOnly} onChange={(e) => setHoliday(e.target.value)} />
           </Field>

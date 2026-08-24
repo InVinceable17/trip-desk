@@ -842,6 +842,11 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   padding: 8px 12px; border: 1px solid var(--line-soft); border-left: 3px solid var(--accent);
   border-radius: 2px; background: var(--card); box-shadow: var(--shadow);
 }
+/* Nothing to announce when no doc is linked — just leave the way in. */
+.srcbar.slim {
+  border: 0; background: none; box-shadow: none; padding: 0;
+  margin-bottom: -8px;
+}
 .srcbar.has-drift { border-left-color: var(--warn); background: var(--warn-soft); }
 .srcbar.has-drift .srcbar-txt { color: var(--warn); }
 .srcbar-mark {

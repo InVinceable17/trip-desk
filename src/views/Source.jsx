@@ -43,8 +43,8 @@ export function SourceBar({ trip, readOnly, update, who }) {
 
   return (
     <>
-      <div className={`srcbar${drift.length ? " has-drift" : ""}`}>
-        <span className="srcbar-mark" aria-hidden="true" />
+      <div className={`srcbar${drift.length ? " has-drift" : ""}${attached ? "" : " slim"}`}>
+        {attached && <span className="srcbar-mark" aria-hidden="true" />}
         {attached ? (
           <>
             <span className="srcbar-txt">
@@ -58,9 +58,7 @@ export function SourceBar({ trip, readOnly, update, who }) {
               <a className="link" href={src.docUrl} target="_blank" rel="noreferrer noopener">open doc</a>
             )}
           </>
-        ) : (
-          <span className="srcbar-txt muted">Not linked to a planning doc.</span>
-        )}
+        ) : null}
         <span className="grow" />
         <Btn kind={drift.length ? "solid" : "ghost"} onClick={() => setOpen((v) => !v)} disabled={readOnly}>
           {open ? "close" : attached ? (drift.length ? "review" : "pull update") : "link a doc"}
@@ -137,7 +135,6 @@ function SourcePanel({ trip, who, drift, update, onClose }) {
           <span className="lbl">Doc link</span>
           <input value={url} placeholder="https://docs.google.com/document/d/…"
             onChange={(e) => setUrl(e.target.value)} />
-          <span className="fld-hint">Only a link — Google won't let the doc be edited inside this page.</span>
         </label>
         <label className="fld" style={{ flex: "1 1 180px" }}>
           <span className="lbl">Call it</span>
@@ -148,11 +145,6 @@ function SourcePanel({ trip, who, drift, update, onClose }) {
 
       {/* ---- pulling it in ---- */}
       <div className="lbl accent gap-t">Pull the doc in</div>
-      <p className="hint">
-        Open the doc, select all, copy, and paste it here. If it's too prose-shaped to read
-        cleanly, copy the import prompt instead and hand it to Claude along with the doc —
-        paste back the JSON it returns and this reads that just the same.
-      </p>
       <textarea
         className="srcpaste" rows={7} value={text} placeholder="Paste the doc's text — or JSON from Claude"
         onChange={(e) => { setText(e.target.value); setPreview(null); setDone(null); }}
@@ -176,7 +168,7 @@ function SourcePanel({ trip, who, drift, update, onClose }) {
         <div className="srcpreview gap-t">
           <div className="lbl accent">What it found</div>
           <ul className="srcfound">
-            {p.name && <li><b>{p.name}</b> — trip name</li>}
+            {p.name && <li><b>{p.name}</b></li>}
             {p.dates && <li>{p.dates.start} → {p.dates.end}</li>}
             {p.travelers ? <li>{p.travelers} travellers</li> : null}
             {p.segments.length > 0 && (
@@ -184,13 +176,13 @@ function SourcePanel({ trip, who, drift, update, onClose }) {
             )}
             {p.stays.length > 0 && <li>{p.stays.map((s) => s.name).join(" · ")}</li>}
             {Object.keys(p.days).length > 0 && (
-              <li>{Object.keys(p.days).length} days with plans on them</li>
+              <li>{Object.keys(p.days).length} days with plans</li>
             )}
           </ul>
 
           {p.unparsed.length > 0 && (
             <details className="srcunparsed">
-              <summary>{p.unparsed.length} line{p.unparsed.length === 1 ? "" : "s"} it didn't understand — nothing from these is imported</summary>
+              <summary>{p.unparsed.length} line{p.unparsed.length === 1 ? "" : "s"} not understood</summary>
               <ul>{p.unparsed.slice(0, 40).map((l, i) => <li key={i}>{l}</li>)}</ul>
             </details>
           )}
@@ -211,14 +203,12 @@ function SourcePanel({ trip, who, drift, update, onClose }) {
 
       {/* ---- disagreements ---- */}
       <div className="lbl accent gap-t">
-        Where this trip and the doc differ
+        Differences
         {drift.length > 0 && <span className="muted"> · {drift.length}</span>}
       </div>
       {drift.length === 0 ? (
         <Empty>
-          {src.kind === "gdoc"
-            ? "Everything the doc has an opinion about matches what's here."
-            : "Nothing to compare yet — pull the doc in first."}
+          {src.kind === "gdoc" ? "Everything matches." : "Pull the doc in first."}
         </Empty>
       ) : (
         <table className="srcdrift">

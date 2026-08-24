@@ -181,19 +181,13 @@ export default function Flights({ trip, update, mcp, readOnly }) {
   return (
     <div className="stack">
       {!trip.dates.locked && (
-        <div className="banner note">
-          Trip dates aren't locked yet. Searches still work — lock them in <b>Dates</b> when you're
-          ready and everything downstream will follow.
-        </div>
+        <div className="banner note">Trip dates aren't locked yet.</div>
       )}
 
       {/* --------------------------------------------------------- what's set */}
-      <Card title="Your transportation" accent
-        right={<span className="muted">what's actually happening, in date order</span>}>
+      <Card title="Transport" accent>
         {!travelLegs(trip).length && (
-          <div className="empty">
-            Nothing set yet. Book a flight below, or add a train or transfer.
-          </div>
+          <div className="empty">Nothing set yet.</div>
         )}
         {travelLegs(trip).length > 0 && (
           <div className="travellist">
@@ -220,22 +214,12 @@ export default function Flights({ trip, update, mcp, readOnly }) {
             ))}
           </div>
         )}
-        {bookedFlight(trip) && (
-          <p className="hint">
-            Your flights are booked, so they're no longer priced against the market — the total
-            uses what you actually paid. Edit the confirmation on the flight card below.
-          </p>
-        )}
       </Card>
 
       {/* ------------------------------------------------------ getting around */}
-      <Card title="Getting around"
-        right={<span className="muted">trains, ferries, transfers between cities</span>}>
+      <Card title="Between cities">
         {!(trip.travel || []).length && (
-          <div className="empty">
-            Nothing yet. Flights come from the options below; add the legs between cities here and
-            they'll appear on the Travel row of the calendar.
-          </div>
+          <div className="empty">Nothing yet.</div>
         )}
         {(trip.travel || []).length > 0 && (
           <div className="tbl-scroll">
@@ -294,15 +278,12 @@ export default function Flights({ trip, update, mcp, readOnly }) {
       {/* ------------------------------------------------------------ search */}
       {HOSTED && (
         <div className="banner note">
-          Live fare search runs through a connector that only exists inside Claude, so it isn't
-          here. The <b>open fares</b> and <b>open search</b> links below still jump straight to the
-          right Google Flights page, and Claude can check prices for you and hand back the JSON.
+          Live fare search isn't available here — the <b>open fares</b> links still go to Google Flights.
         </div>
       )}
       {bookedFlight(trip) && !shopping && (
         <div className="row-wrap center">
           <Btn className="sm" onClick={() => setShopping(true)}>Shop for flights anyway</Btn>
-          <span className="hint inline">Flights are booked — searching and price checks are put away.</span>
         </div>
       )}
 
@@ -321,10 +302,6 @@ export default function Flights({ trip, update, mcp, readOnly }) {
             </Btn>
           </div>
         </div>
-        <p className="hint">
-          Mirror the airports for a round trip, or point the return at a different city for an open jaw.
-          Prices are per adult for the whole trip.
-        </p>
         {search.err && <div className="banner warn tight">{search.err}</div>}
         {search.rows && <RowTable rows={search.rows} caption={`${search.rows.length} outbound flights`} onPick={pickOutbound} pickedKey={search.picked && search.picked.depart} />}
         {search.retRows && <RowTable rows={search.retRows} caption={`${search.retRows.length} return flights`} onPick={pickReturn} />}
@@ -342,7 +319,6 @@ export default function Flights({ trip, update, mcp, readOnly }) {
             const r = parsePaste(paste, { ...trip, windowStart: trip.window.start, travelers: trip.travelers });
             setDraft(r.draft); setPaste(""); setFlash(r.ok ? "Read it — check it over, then save." : r.why);
           }}>Fill the form</Btn>
-          <span className="hint inline">Best-effort text reading — it pulls out dates, airports, times and prices, then hands you the form.</span>
         </div>
       </Card>
       )}
@@ -361,8 +337,7 @@ export default function Flights({ trip, update, mcp, readOnly }) {
 
       {panel === "io" && (
         <Card>
-          <p className="hint">Paste JSON and press Import — options with matching ids get overwritten.</p>
-          <textarea value={io} onChange={(e) => setIo(e.target.value)} rows={8} className="mono-sm mt8" />
+          <textarea value={io} onChange={(e) => setIo(e.target.value)} rows={8} className="mono-sm" />
           <div className="row-wrap mt8">
             <Btn kind="solid" disabled={readOnly} onClick={() => {
               try {
@@ -474,10 +449,6 @@ export default function Flights({ trip, update, mcp, readOnly }) {
           <div className="sheet-inner card">
             <div className="card-body">
               <div className="lbl accent">Mark this flight booked</div>
-              <p className="hint">
-                Booked flights stop being quotes. The price check is switched off for this option and
-                the trip's flight cost becomes what you actually paid.
-              </p>
               <div className="row-wrap mt8">
                 <Field label="Confirmation" w="1 1 150px"><input value={booking.ref} onChange={(e) => setBooking({ ...booking, ref: e.target.value.toUpperCase() })} placeholder="ABC123" /></Field>
                 <Field label="Total paid" w="0 1 170px" hint={`for ${trip.travelers}`}>
@@ -491,7 +462,7 @@ export default function Flights({ trip, update, mcp, readOnly }) {
                 </Field>
               </div>
               <div className="row-wrap">
-                <Field label="Anything else from the confirmation" w="1 1 300px">
+                <Field label="Notes" w="1 1 300px">
                   <input value={booking.notes} placeholder="seats 24A/24B, bags paid" onChange={(e) => setBooking({ ...booking, notes: e.target.value })} />
                 </Field>
               </div>

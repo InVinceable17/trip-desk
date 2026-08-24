@@ -198,8 +198,7 @@ function App() {
       {note && <div className="banner warn">{note}</div>}
       {!HOSTED && mcp === null && route.view === "trip" && route.phase === "flights" && (
         <div className="banner warn">
-          Price checks and flight search are off — this view can't reach your Browserless connector.
-          Everything else works, and the fare links still open Google Flights.
+          Price checks are off — no Browserless connector. Fare links still open Google Flights.
         </div>
       )}
 
@@ -246,9 +245,9 @@ function App() {
       )}
 
       <footer className="foot">
-        {mode === MODE.SAVING ? (saving ? "Saving…" : "Saved to this artifact.")
-          : mode === MODE.READONLY ? "Read-only view."
-            : "Saved to this browser only."}
+        {mode === MODE.SAVING ? (saving ? "Saving…" : "Saved")
+          : mode === MODE.READONLY ? "Read-only"
+            : "This browser only"}
       </footer>
     </div>
   );
@@ -300,8 +299,8 @@ function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, readOn
             <div className="head-dates">
               {trip.dates.start
                 ? <>{dayLabel(trip.dates.start)} – {dayLabel(trip.dates.end)}{nights ? ` · ${nights}n` : ""}</>
-                : "dates not set"}
-              {" · "}{trip.travelers} traveler{trip.travelers === 1 ? "" : "s"}
+                : "no dates"}
+              {" · "}{trip.travelers}p
             </div>
             <div className="head-cost">
               <button className={`costbtn${costOpen ? " on" : ""}`} onClick={onCost}

@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { label as dayLabel } from "../flights.js";
 import {
   tripDays, tripNights, assignedNights, segmentSpans, cityFlags,
-  addSegment, moveSegment, segColor, bookedFlight, citiesLocked,
+  addSegment, moveSegment, segColor, bookedFlight,
   cityPlan, setDayTrip,
 } from "../model.js";
 import { Btn, Card } from "../components/ui.jsx";
@@ -27,7 +27,6 @@ export default function Cities({ trip, update, readOnly }) {
   const spans = segmentSpans(trip);
   const flags = cityFlags(trip);
   const booked = bookedFlight(trip);
-  const allLocked = citiesLocked(trip);
 
   const setSegments = (next) =>
     update((t) => ({ ...t, segments: typeof next === "function" ? next(t.segments) : next }));
@@ -137,50 +136,33 @@ export default function Cities({ trip, update, readOnly }) {
   return (
     <div className="stack">
       {!trip.dates.locked && (
-        <div className="banner warn">
-          Lock your trip dates first — until then there's no calendar to lay cities against.
-        </div>
+        <div className="banner warn">Lock your trip dates first.</div>
       )}
 
       <Card
-        title="Where you sleep each night"
+        title="Cities"
         accent
         right={
           <span className={`nightcount${got === total && total ? " ok" : ""}`}>
-            <b>{got}</b> of <b>{total}</b> nights assigned
+            <b>{got}</b> of <b>{total}</b> nights
             {trip.segments.length > 0 && (
               <> · <b>{trip.segments.filter((s) => s.locked).length}</b> of <b>{trip.segments.length}</b> locked</>
             )}
           </span>
         }
       >
-        <p className="hint" style={{ marginTop: 0 }}>
-          Drag a stop's right edge on the calendar above to move nights between it and the next one;
-          the last stop's edge changes the total. Lock a stop once its dates are settled — a locked
-          stop won't move when you adjust the ones around it. Day trips hang off the stop you sleep
-          in and don't consume nights of their own. The day a stop begins is a <b>travel day</b> —
-          you wake in the city before it and go to sleep in this one.
-        </p>
-
         {flags.length > 0 && (
           <div className="banner warn tight flags">{flags.map((f) => <span key={f}>{f}</span>)}</div>
         )}
-        {allLocked && got === total && total > 0 && (
-          <div className="banner good tight">
-            All {trip.segments.length} cities locked and the nights add up. Stays and Days build on this.
-          </div>
-        )}
         {booked && !flags.length && trip.segments.length > 0 && (
           <div className="banner good tight">
-            Matches your booked flights — in at {booked.out.to}, out of {booked.ret.from}.
+            Matches your flights — in {booked.out.to}, out {booked.ret.from}.
           </div>
         )}
-      </Card>
 
-      <Card title="Cities in order">
         {!trip.segments.length && (
           <div className="empty">
-            {days.length ? "Add your first city below." : "Lock trip dates to start laying out cities."}
+            {days.length ? "Add your first city." : "Lock trip dates first."}
           </div>
         )}
 
@@ -220,8 +202,6 @@ export default function Cities({ trip, update, readOnly }) {
               />
               <Btn className="sm" kind="solid" onClick={add} disabled={readOnly || !draft.trim()}>Add stop</Btn>
               <Btn className="sm" onClick={() => { setAdding(false); setDraft(""); }}>Done</Btn>
-              <div className="grow" />
-              <span className="hint inline">Enter adds and keeps going</span>
             </div>
           ) : tripFor ? (
             <div className="segrow adding">

@@ -16,9 +16,7 @@ export default function Stays({ trip, update, readOnly }) {
   if (!spans.length) {
     return (
       <div className="stack">
-        <div className="banner note">
-          Lay out your cities first — stays hang off those segments, so they know their own dates.
-        </div>
+        <div className="banner note">Lay out your cities first.</div>
       </div>
     );
   }
@@ -42,9 +40,9 @@ export default function Stays({ trip, update, readOnly }) {
                   {seg.city || "in transit"}
                 </span>
               }
-              right={<span className="muted">{dayLabel(startDate)} overnight · no hotel needed</span>}
+              right={<span className="muted">{dayLabel(startDate)} overnight</span>}
             >
-              <div className="empty">You're travelling this night — nothing to book.</div>
+              <div className="empty">Travelling this night — no bed needed.</div>
             </Card>
           );
         }
@@ -62,18 +60,18 @@ export default function Stays({ trip, update, readOnly }) {
               <span className="segright">
                 <span className="muted">
                   Arrive {dayLabel(startDate)} · depart {dayLabel(endDate)} · {nights} night{nights === 1 ? "" : "s"}
-                  {lead ? <> · {fmtMoney(lead.total, lead.currency)}{lead.status === "Booked" ? " booked" : " est."}</> : " · nothing yet"}
+                  {lead ? <> · {fmtMoney(lead.total, lead.currency)}{lead.status === "Booked" ? " booked" : " est."}</> : ""}
                 </span>
                 {seg.city && (
                   <span className="maplinks">
-                    <a href={hotelsIn(seg.city)} target="_blank" rel="noreferrer">hotels on maps ↗</a>
-                    <a href={mapsSearch(seg.city)} target="_blank" rel="noreferrer">{seg.city} ↗</a>
+                    <a href={hotelsIn(seg.city)} target="_blank" rel="noreferrer">hotels ↗</a>
+                    <a href={mapsSearch(seg.city)} target="_blank" rel="noreferrer">map ↗</a>
                   </span>
                 )}
               </span>
             }
           >
-            {list.length === 0 && <div className="empty">No places saved for {seg.city || "this stop"} yet.</div>}
+            {list.length === 0 && <div className="empty">Nothing saved yet.</div>}
 
             {list.length > 0 && (
               <div className="tbl-scroll">
@@ -131,13 +129,8 @@ export default function Stays({ trip, update, readOnly }) {
 
             <div className="row-wrap mt8">
               <Btn disabled={readOnly} onClick={() => setStays((all) => [...all, { ...blankStay(seg.id) }])}>
-                + Add a place in {seg.city || "this city"}
+                + Add a place
               </Btn>
-              {seg.city && list.length > 0 && (
-                <span className="hint inline">
-                  A day trip out of {seg.city} doesn't move this booking — set the day's location in <b>Days</b>.
-                </span>
-              )}
             </div>
           </Card>
         );

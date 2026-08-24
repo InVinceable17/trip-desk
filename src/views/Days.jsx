@@ -42,7 +42,7 @@ export default function Days({ trip, update, readOnly }) {
   if (!days.length) {
     return (
       <div className="stack">
-        <div className="banner note">Lock your trip dates and the days appear here, one row each.</div>
+        <div className="banner note">Lock your trip dates first.</div>
       </div>
     );
   }
@@ -69,7 +69,7 @@ export default function Days({ trip, update, readOnly }) {
     <div className="stack">
       <div className="toolbar">
         <span className={`nightcount${lockedCount === days.length ? " ok" : ""}`}>
-          <b>{lockedCount}</b> of <b>{days.length}</b> days locked
+          <b>{lockedCount}</b> of <b>{days.length}</b> locked
         </span>
         <div className="grow" />
         <Btn className="sm" onClick={() => setAll(true)}>Collapse all</Btn>

@@ -148,7 +148,8 @@ console.log("\nphases 4 and 5");
 await p.click(".step:has-text('Stays')");
 await p.waitForTimeout(300);
 check("one stays card per city", (await p.locator(".card").count()) >= 2);
-await p.click("button:has-text('Add a place in Rome')");
+// The add button is per-card and no longer names its city, so scope by card.
+await p.click(".card:has(.segtitle:has-text('Rome')) button:has-text('Add a place')");
 await p.waitForTimeout(200);
 await p.fill(".tbl.stays tbody tr:first-child td:first-child input", "Hotel Artemide");
 await p.fill(".tbl.stays tbody tr:first-child td:nth-child(2) input", "1200");

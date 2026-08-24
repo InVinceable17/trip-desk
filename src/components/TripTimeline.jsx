@@ -37,7 +37,7 @@ export default function TripTimeline({ trip, phase, update, readOnly }) {
   if (!days.length) {
     return (
       <section className="ribbon card">
-        <div className="tl-empty">Set a date window in <b>Dates</b> and the trip calendar appears here.</div>
+        <div className="tl-empty">Set a date window in <b>Dates</b>.</div>
       </section>
     );
   }
@@ -173,8 +173,8 @@ export default function TripTimeline({ trip, phase, update, readOnly }) {
   const hint = onDates && !locked && !readOnly
     ? "click a day to set the start, then another to set the end"
     : phase === "cities" && segs.length
-      ? "drag a city's right edge to move nights; the last one changes the total"
-      : "click anything on the calendar for its details";
+      ? "drag a city's right edge to move nights"
+      : "";
 
   return (
     <section className="ribbon card">
@@ -186,15 +186,7 @@ export default function TripTimeline({ trip, phase, update, readOnly }) {
         holidays={new Set(trip.holidays || [])}
         offRange={useWindow && locked ? { start: trip.dates.start, end: trip.dates.end } : null}
         compact
-        footer={
-          <>
-            {hint && <span className="hintline">{hint}</span>}
-            <span className="grow" />
-            <span>{useWindow ? "shopping window" : "the trip"}</span>
-            {(trip.holidays || []).length > 0 && <span><i className="swatch hol" />holiday</span>}
-            <span>bold = weekends</span>
-          </>
-        }
+        footer={hint ? <span className="hintline">{hint}</span> : null}
       />
       {sel && <Detail trip={trip} sel={sel} onClose={() => setSel(null)} />}
     </section>
