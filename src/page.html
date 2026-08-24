@@ -832,6 +832,235 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   .head-right { text-align: left; }
   .tripname-btn { max-width: 70vw; }
 }
+
+/* ------------------------------------------------------------ doc source */
+/* The strip that says whose doc these plans came from. Quiet when the two
+   agree; it earns attention only when they have drifted apart. */
+.srcbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 12px;
+  padding: 8px 12px; border: 1px solid var(--line-soft); border-left: 3px solid var(--accent);
+  border-radius: 2px; background: var(--card); box-shadow: var(--shadow);
+}
+.srcbar.has-drift { border-left-color: var(--warn); background: var(--warn-soft); }
+.srcbar.has-drift .srcbar-txt { color: var(--warn); }
+.srcbar-mark {
+  width: 7px; height: 7px; border-radius: 1px; flex: 0 0 auto;
+  background: var(--accent);
+}
+.srcbar.has-drift .srcbar-mark { background: var(--warn); }
+.srcbar-txt { color: var(--ink); }
+.srcbar-txt strong { font-weight: 600; }
+.srcbar-when { color: var(--muted); }
+.chip.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+
+.gap-t { margin-top: 14px; }
+.fld.inline { flex-direction: row; align-items: center; gap: 8px; }
+
+.srcpaste {
+  width: 100%; font-family: var(--mono); font-size: 12px; line-height: 1.5;
+  padding: 10px; border: 1px solid var(--line); border-radius: 2px;
+  background: var(--sunk); color: var(--ink); resize: vertical;
+}
+.srcpaste:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.srcpreview { border-top: 1px solid var(--line-soft); padding-top: 12px; }
+.srcfound { margin: 8px 0 0; padding-left: 18px; font-family: var(--mono); font-size: 12px; line-height: 1.7; }
+.srcunparsed { margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.srcunparsed summary { cursor: pointer; color: var(--warn); }
+.srcunparsed ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
+
+/* Two columns of the same fact, side by side, so choosing between them is a
+   glance rather than a memory test. */
+.srcdrift { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.srcdrift th {
+  text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); font-weight: 500;
+  padding: 4px 8px; border-bottom: 1px solid var(--line);
+}
+.srcdrift td { padding: 7px 8px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.srcdrift td.doc { color: var(--accent-ink); }
+.srcdrift td.mine { color: var(--ink); }
+.srcdrift tr.orphan td.doc { text-decoration: line-through; color: var(--muted); }
+.srcdrift td.acts { text-align: right; white-space: nowrap; }
+.srcdrift td.acts .btn + .btn { margin-left: 6px; }
+@media (max-width: 620px) {
+  .srcdrift thead { display: none; }
+  .srcdrift tr { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+  .srcdrift td { border: 0; padding: 2px 0; }
+  .srcdrift td.lbl { grid-column: 1 / -1; }
+  .srcdrift td.acts { grid-column: 1 / -1; text-align: left; margin-top: 6px; }
+}
+
+/* ==========================================================================
+   Phone.
+
+   Below 768px this stops being a desk instrument and becomes an app you hold.
+   Everything here is additive and scoped — the wide layout above this
+   breakpoint is exactly what it was, Gantt and all.
+
+   Three things do most of the work: the system font (mono at 11px is a
+   desktop luxury and unreadable at arm's length), 44px touch targets, and
+   moving the phase stepper to a fixed bottom bar where a thumb can reach it.
+   Numerals, codes and prices stay monospaced — they are tabular data and the
+   alignment is the point.
+   ========================================================================== */
+@media (max-width: 768px) {
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    --tabbar: 56px;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: var(--sans);
+    -webkit-tap-highlight-color: transparent;
+    padding: 0 0 calc(var(--tabbar) + env(safe-area-inset-bottom) + 16px);
+  }
+  .wrap {
+    gap: 12px;
+    padding: calc(env(safe-area-inset-top) + 10px) max(14px, env(safe-area-inset-left)) 0
+             max(14px, env(safe-area-inset-right));
+  }
+
+  /* ---- header: stays put, gets out of the way ---- */
+  .head {
+    position: sticky; top: 0; z-index: 40;
+    margin: calc(env(safe-area-inset-top) * -1 - 10px) -14px 0;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px 8px;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--line);
+    flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 8px;
+  }
+  .head-left { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; }
+  .head-right { flex: 0 0 auto; text-align: right; }
+  .brand { font-size: 17px; }
+  .crumb { min-width: 0; }
+  .tripname-btn { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .head-dates { font-size: 10px; line-height: 1.35; }
+  .head-cost { justify-content: flex-end; }
+
+  /* ---- cards read as iOS grouped sections ---- */
+  .card { border-radius: 12px; border-color: var(--line-soft); }
+  .card.accent-top { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+  .card-head { padding: 13px 16px 0; }
+  .card-body { padding: 12px 16px 16px; }
+
+  /* ---- anything you tap is at least a fingertip ---- */
+  .btn { min-height: 44px; padding-left: 14px; padding-right: 14px; border-radius: 9px; }
+  .step, .costbtn, .link, .brand { min-height: 44px; }
+  .link { display: inline-flex; align-items: center; }
+
+  /* 16px or iOS zooms the whole page on focus, and never zooms back. */
+  input, select, textarea {
+    font-size: 16px; min-height: 44px; border-radius: 9px; padding: 10px 12px;
+  }
+  input.bare { min-height: 38px; }
+  input.time, input.cost, input.url { width: auto; min-width: 84px; }
+  textarea { min-height: 96px; }
+  .checkbox { min-height: 44px; min-width: 44px; }
+
+  /* ---- the source bar rides under the header ---- */
+  .srcbar {
+    position: sticky; top: calc(env(safe-area-inset-top) + 52px); z-index: 30;
+    border-radius: 10px; padding: 10px 12px; font-size: 12px;
+  }
+
+  /* ---- the ribbon keeps its shape and scrolls sideways ---- */
+  .ribbon { padding: 10px 0 8px; border-radius: 12px; }
+  .tl-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    padding: 0 12px;
+    /* Fade the cut edge so it reads as "there is more", not "it is broken". */
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  }
+  .tl { min-width: 620px; }
+
+  /* ---- the stepper becomes the tab bar ---- */
+  .stepper {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    border: 0; border-top: 1px solid var(--line); border-radius: 0;
+    gap: 0; padding: 0 0 env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    overflow: visible;
+  }
+  .step {
+    flex: 1 1 0; min-width: 0; flex-direction: column; gap: 3px;
+    border-radius: 0; background: none; padding: 7px 2px 6px;
+    font-size: 9px; letter-spacing: .04em;
+  }
+  .step-l { display: block; }          /* the tab bar wants its labels back */
+  .step.on { background: none; color: var(--accent-ink); }
+  .step.on .step-n { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .step-n { width: 22px; height: 22px; }
+  .step:active { opacity: .5; }
+
+  /* ---- odds and ends ---- */
+  .foot { text-align: center; padding: 4px 0 0; }
+  .banner { border-radius: 10px; font-size: 12px; }
+  .srcdrift td.acts .btn { flex: 1 1 0; }
+  .srcdrift td.acts { display: flex; gap: 8px; }
+  .srcpaste { font-size: 16px; }
+}
+
+/* A phone in landscape is short, not wide — the sticky chrome would eat it. */
+@media (max-width: 926px) and (orientation: landscape) and (max-height: 480px) {
+  .head, .srcbar { position: static; }
+}
+
+/* --------------------------------------------------------- phone header */
+/* Two rows, because one cannot hold a name, a date range, a total and a nav
+   control at 390px without shredding all four. Row one is the title bar; row
+   two is the trip's numbers. With a trip open the wordmark stands down — the
+   trip's own name is the title, and the mark alone is the way back. */
+@media (max-width: 768px) {
+  .head { flex-wrap: wrap; row-gap: 6px; }
+  .head-left { flex: 1 1 100%; }
+  .head-right {
+    flex: 1 1 100%; display: flex; align-items: center; gap: 10px;
+    text-align: left; justify-content: space-between;
+  }
+  .head-dates { flex: 1 1 auto; min-width: 0; }
+  .head-cost { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+
+  .brand { white-space: nowrap; gap: 6px; }
+  .brandword { font-size: 17px; }
+  .head-left:has(.crumb) .brandword,
+  .head-left:has(.crumb) .crumb .sep { display: none; }
+  .head-left:has(.crumb) .brandmark {
+    width: 9px; height: 9px; transform: rotate(45deg); border-radius: 1px;
+  }
+  .tripname-btn {
+    font-size: 17px; font-weight: 600; letter-spacing: -.01em;
+    max-width: 74vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rename { font-size: 17px; }
+}
+
+/* Without :has() the wordmark simply stays — crowded, but never broken. */
+@supports not selector(:has(*)) {
+  @media (max-width: 768px) { .tripname-btn { max-width: 42vw; } }
+}
+
+/* ----------------------------------------------------------- phone prose */
+/* Monospace at 11px is a desktop luxury: on the desk it signals "this is
+   instrument text", on a phone held at arm's length it is just hard to read.
+   Explanatory paragraphs go to the system font; labels, codes, dates and
+   money stay mono, because there the alignment carries meaning. */
+@media (max-width: 768px) {
+  .hint, .banner, .empty, .srcbar-txt, .srcunparsed, .srcfound {
+    font-family: var(--sans); font-size: 13px; line-height: 1.5;
+  }
+  .hint { font-size: 12.5px; }
+  .srcunparsed summary { font-size: 12.5px; }
+  .foot { font-family: var(--sans); font-size: 11px; }
+}
 </style>
 
 <div id="root"></div>

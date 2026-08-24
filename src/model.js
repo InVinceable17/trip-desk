@@ -75,6 +75,23 @@ export const blankItem = (kind = "idea") => ({
    city you are sleeping in. Empty means "wherever the segment says". */
 export const blankDay = () => ({ notes: "", items: [], city: "", locked: false });
 
+/* ------------------------------------------------------------ doc source */
+/* A trip may be a structured view of a Google Doc somebody else actually
+   writes in. `text` is the doc exactly as it was last read; `fields` records
+   what the doc said for each field we ingested, keyed by the same dotted path
+   `fieldValue` reads. Keeping the doc's version separate from the trip's is
+   the whole trick: it is what lets the app say "this diverged" instead of
+   quietly overwriting one side with the other. */
+export const blankSource = () => ({
+  kind: "",           // "" | "gdoc"
+  docUrl: "",
+  docTitle: "",
+  syncedAt: "",       // ISO of the last import
+  syncedBy: "",       // display name, so a shared desk says who pulled it
+  text: "",
+  fields: {},         // { "stays.stay_x.name": "Hotel Artemide" }
+});
+
 export function blankTrip(name = "New trip") {
   const now = new Date().toISOString();
   return {
@@ -105,6 +122,8 @@ export function blankTrip(name = "New trip") {
     stays: [],
     /* phase 5 */
     days: {},
+    /* provenance, when the trip is fed by a doc */
+    source: blankSource(),
   };
 }
 
@@ -134,6 +153,8 @@ export function hydrateTrip(t) {
     segments: (t.segments || []).map((s) => ({ ...blankSegment(), ...s })),
     stays: (t.stays || []).map((s) => ({ ...blankStay(), ...s })),
     days: t.days && typeof t.days === "object" ? t.days : {},
+    source: { ...blankSource(), ...(t.source || {}),
+      fields: (t.source && t.source.fields) || {} },
   };
 }
 

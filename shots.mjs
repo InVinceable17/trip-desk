@@ -41,7 +41,11 @@ const trip2 = { ...JSON.parse(JSON.stringify(trip)), id: "t2", name: "Japan, che
   destAirports: "HND, NRT, KIX, ITM" };
 const idx = JSON.stringify({ schema: 2, trips: [{ id: "t1" }, { id: "t2" }], prefs: {} });
 const server = await serve(8811, { "data/index.json": idx, "data/trips/t1.json": JSON.stringify(trip), "data/trips/t2.json": JSON.stringify(trip2) });
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+/* Playwright finds its own browser. PW_CHROME overrides that, the same way
+   check.mjs and check-web.mjs do — a hardcoded path here meant this script
+   only ever ran on one machine. */
+const CHROME = process.env.PW_CHROME;
+const b = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
 const errs = [];
 async function shot(name, hash, theme, w = 1280) {
   const p = await b.newPage({ viewport: { width: w, height: 1000 }, colorScheme: theme });

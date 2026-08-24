@@ -19,6 +19,7 @@ import Stays from "./views/Stays.jsx";
 import Days from "./views/Days.jsx";
 import Backup from "./views/Backup.jsx";
 import SignIn from "./views/SignIn.jsx";
+import { SourceBar } from "./views/Source.jsx";
 
 const VIEWS = { dates: Dates, flights: Flights, cities: Cities, stays: Stays, days: Days };
 
@@ -173,6 +174,7 @@ function App() {
 
   const readOnly = mode === MODE.READONLY;
   const trip = route.view === "trip" ? db.trips[route.id] : null;
+  const who = (user && (user.displayName || user.email)) || "";
 
   return (
     <div className="wrap">
@@ -222,6 +224,11 @@ function App() {
           {/* The calendar is the fixed reference; the chapters below it change.
               It sits above the stepper so edits in a section can be judged
               against it before they are locked in. */}
+          {/* Where these plans came from, before the plans themselves. */}
+          <SourceBar
+            trip={trip} readOnly={readOnly} who={who}
+            update={(fn) => updateTrip(trip.id, fn)}
+          />
           <TripTimeline
             trip={trip} phase={route.phase} readOnly={readOnly}
             update={(fn) => updateTrip(trip.id, fn)}
@@ -261,7 +268,7 @@ function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, readOn
       <div className="head-left">
         <button className="brand" onClick={onHome} aria-label="All trips">
           <span className="brandmark" aria-hidden="true" />
-          Trip Desk
+          <span className="brandword">Trip Desk</span>
         </button>
         {trip && (
           <div className="crumb">
