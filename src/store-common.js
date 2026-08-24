@@ -120,3 +120,28 @@ export const takeDraft = () => {
 /** Mirror the whole store into this browser, and take a snapshot of it. */
 export const cacheStore = cacheAll;
 export const readCachedStore = readCache;
+
+/* ------------------------------------------------------------ what a read means */
+
+/**
+ * Decide what an empty-looking read of the workspace actually tells you.
+ *
+ *   "open"     trust it — use what came back
+ *   "seed"     genuinely new: nothing stored and nothing ever initialised
+ *   "unknown"  the read could not be confirmed against the server. Show this
+ *              browser's own copy, change nothing, and above all do not seed.
+ *
+ * The distinction matters because "no trips" and "could not read the trips"
+ * look identical at the call site, and one of them must never lead to a write.
+ * Firestore hands back an empty result — no error — when it is offline with a
+ * cold cache, so treating empty as authoritative means a phone on a bad
+ * connection decides the workspace is new, seeds the sample trip, and saves
+ * that over a perfectly good index. Emptiness is only evidence when it came
+ * from the server.
+ */
+export function readVerdict({ fromCache = false, indexExists = false, tripCount = 0 } = {}) {
+  if (tripCount > 0) return "open";      // data is data, cached or not
+  if (fromCache) return "unknown";       // empty from cache proves nothing
+  if (indexExists) return "open";        // initialised, and emptied on purpose
+  return "seed";
+}
