@@ -123,6 +123,26 @@ laid out cumulatively and skipping them would slide every city a day left.
 Counts of "cities" filter it out; counts of *nights* must not, since that is
 the check that every night is accounted for.
 
+**A row with no lock must not be part of a lock check.** Removing the lock
+control from the transit row while `citiesLocked` still required *every*
+segment locked made the Cities phase permanently unfinished — a lock nobody
+could ever close. `cityStops()` is the filter: counts and checks about
+"cities" exclude nights under way, counts about *nights* must not, since that
+is the check that every night is accounted for.
+
+**Flights and the layout are two accounts of one trip.** `flightWindow()` is
+the trip the flights describe; `datesDisagree()` returns where the two differ,
+and Dates offers `adoptFlightDates()`. The chain is flights → dates → nights →
+cities, and the last three already checked each other — this is the missing
+first link, and the most load-bearing one, because the flights are the half
+already paid for.
+
+**An overnight leg is not an instant.** The Travel row draws points inside a
+single day; a leg with `plusOne` is given `endIdx` and drawn midday-to-midday
+so it visibly crosses the night it consumes. Width cannot distinguish the two
+cases — mid-to-mid is also exactly one day wide — so `check.mjs` counts how
+many day cells each chip overlaps.
+
 **`blankSegment` must not default `kind`.** `hydrateTrip` spreads it over every
 stored segment, so a default there is not a default — it is a rewrite of every
 trip already saved, and it stamps `"city"` onto exactly the one-night stop

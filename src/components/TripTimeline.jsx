@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { range, label as dayLabel, to12h, showDur, parseDur } from "../flights.js";
+import { range, label as dayLabel, to12h, showDur, parseDur, toUTC, fromUTC } from "../flights.js";
 import {
   tripDays, tripNights, segmentSpans, segColor, leadStay, cityForDay,
   travelLegs, dayTrips, travelDays, dayStay, travelOn, KIND_GLYPH, fmtMoney,
@@ -82,9 +82,15 @@ export default function TripTimeline({ trip, phase, update, readOnly }) {
         const at = idx(L.date);
         const off = at < 0;
         const pinned = off ? (L.date < days[0] ? 0 : days.length - 1) : at;
+        /* An overnight leg is the one thing on this row that is not an
+           instant: it leaves on one day and lands on another, and drawing it
+           inside a single column is the reason the night it consumes was
+           invisible in the first place. */
+        const lands = L.plusOne && !off && pinned + 1 < days.length ? pinned + 1 : pinned;
         return {
           key: L.id,
           idx: pinned,
+          endIdx: lands,
           off,
           glyph: KIND_GLYPH[L.kind] || "→",
           label: `${L.from || "?"}→${L.to || "?"}`,
@@ -92,7 +98,9 @@ export default function TripTimeline({ trip, phase, update, readOnly }) {
           selected: !!(sel && sel.type === "travel" && sel.id === L.id),
           title: off
             ? `${dayLabel(L.date)} — outside the trip dates · ${L.from}→${L.to}`
-            : `${dayLabel(L.date)} · ${L.from}→${L.to}${L.depart ? ` at ${to12h(L.depart)}` : ""}`,
+            : `${dayLabel(L.date)}${L.plusOne ? ` → ${dayLabel(fromUTC(toUTC(L.date) + 86400000))}` : ""}`
+              + ` · ${L.from}→${L.to}${L.depart ? ` at ${to12h(L.depart)}` : ""}`
+              + `${L.plusOne && L.arrive ? `, lands ${to12h(L.arrive)}` : ""}`,
           onClick: () => pick("travel", L.id),
         };
       }),

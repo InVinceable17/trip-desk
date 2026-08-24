@@ -200,7 +200,8 @@ import {
   segmentSpans, cityForDay, moveBoundary, resizeLast, assignedNights,
   cityFlags, tripCost, phaseState, openBookings, indexEntry, blankSegment,
   blankStay, blankItem, isTransitStop, unplannedMoves, nightsBetween,
-  blankTransit, transitGap, addTransit,
+  blankTransit, transitGap, addTransit, cityStops,
+  flightWindow, datesDisagree, adoptFlightDates,
 } from "./src/model.js";
 
 /* The exact shape the live v1 artifact stores. */
@@ -356,7 +357,18 @@ ok("stays quiet when the city and airport agree", () => {
   const t = lockedTrip();
   t.flights.options = [{ ...JSON.parse(JSON.stringify(V1.options[0])) }];
   t.flights.bookedId = "opt_seed_dl_fco_nap";
+  /* The fixture's flight leaves on the 10th while the trip is laid out from
+     the 12th, which is a real disagreement and is now flagged as one — so the
+     dates have to agree before "quiet" means anything. */
+  t.dates = { start: "2026-10-10", end: "2026-10-23", locked: true };
+  t.segments = [{ id: "s0", city: "", nights: 2, locked: true, kind: "transit" }, ...t.segments];
   assert.deepEqual(cityFlags(t), []); // Rome/FCO and Naples/NAP
+});
+ok("flags flights and layout that describe different trips", () => {
+  const t = lockedTrip();               // laid out Oct 12 -> 23
+  t.flights.options = [{ ...JSON.parse(JSON.stringify(V1.options[0])) }];
+  t.flights.bookedId = "opt_seed_dl_fco_nap";   // flies Oct 10 -> 23
+  assert.match(cityFlags(t).join(" "), /flights cover 13 nights; the trip is laid out over 11/);
 });
 
 console.log("\ncost");
@@ -1395,6 +1407,91 @@ ok("it still owns its night, so the nights continue to add up", () => {
 ok("and it wants no bed", () => {
   const t = addTransit(redeye());
   assert.equal(isTransitStop(t, t.segments[0]), true);
+});
+
+/* ------------------------------------------ flights against the layout */
+/* Two accounts of the same fortnight. They are checks on each other, and the
+   flights are the half already paid for. */
+
+console.log("\nflights against the layout");
+
+const flownTrip = () => {
+  const t = blankTrip("Italy");
+  t.dates = { start: "2026-10-10", end: "2026-10-23", locked: true };
+  t.flights.options = [{
+    id: "o1", status: "Booked",
+    out: { date: "2026-10-10", from: "ATL", to: "FCO", depart: "16:35", arrive: "07:35", plusOne: true },
+    ret: { date: "2026-10-23", from: "NAP", to: "ATL", depart: "09:05", arrive: "14:39", plusOne: false },
+  }];
+  t.flights.bookedId = "o1";
+  return t;
+};
+
+ok("the flights describe a trip of their own", () => {
+  assert.deepEqual(flightWindow(flownTrip()), { start: "2026-10-10", end: "2026-10-23" });
+});
+ok("agreeing is silence, not a flag", () => {
+  assert.equal(datesDisagree(flownTrip()), null);
+});
+ok("a trip laid out over different days is a disagreement, with both counts", () => {
+  const t = flownTrip();
+  t.dates = { start: "2026-10-12", end: "2026-10-23", locked: true };
+  const off = datesDisagree(t);
+  assert.ok(off);
+  assert.deepEqual(off.flights, { start: "2026-10-10", end: "2026-10-23" });
+  assert.deepEqual(off.trip, { start: "2026-10-12", end: "2026-10-23" });
+  assert.equal(off.nights.flights, 13);
+  assert.equal(off.nights.trip, 11);
+});
+ok("nothing to disagree with before there are flights or dates", () => {
+  const bare = blankTrip("X");
+  assert.equal(flightWindow(bare), null);
+  assert.equal(datesDisagree(bare), null);
+  const noDates = flownTrip();
+  noDates.dates = { start: "", end: "", locked: false };
+  assert.equal(datesDisagree(noDates), null);
+});
+ok("adopting takes the flights' word and nothing else", () => {
+  const t = flownTrip();
+  t.dates = { start: "2026-10-12", end: "2026-10-23", locked: true };
+  const next = adoptFlightDates(t);
+  assert.equal(next.dates.start, "2026-10-10");
+  assert.equal(next.dates.end, "2026-10-23");
+  assert.equal(next.dates.locked, true, "the lock is the user's, not ours to clear");
+  assert.equal(datesDisagree(next), null);
+});
+ok("adopting is a no-op when there is nothing to adopt", () => {
+  const bare = blankTrip("X");
+  assert.deepEqual(adoptFlightDates(bare), bare);
+});
+
+/* ---- and the lock nobody could ever close ---- */
+ok("a night in the air does not hold the cities phase open", () => {
+  const t = flownTrip();
+  t.segments = [
+    { ...blankTransit(1) },                                   // no lock control exists
+    { ...blankSegment("Rome", 6), locked: true, kind: "city" },
+    { ...blankSegment("Naples", 6), locked: true, kind: "city" },
+  ];
+  assert.equal(cityStops(t).length, 2, "it is not one of the cities");
+  assert.equal(citiesLocked(t), true, "an unlockable row must not block the phase");
+  assert.equal(phaseState(t, "cities"), "done");
+});
+ok("but a real city left open still holds it", () => {
+  const t = flownTrip();
+  t.segments = [
+    { ...blankTransit(1) },
+    { ...blankSegment("Rome", 6), locked: true, kind: "city" },
+    { ...blankSegment("Naples", 6), locked: false, kind: "city" },
+  ];
+  assert.equal(citiesLocked(t), false);
+  assert.equal(phaseState(t, "cities"), "started");
+});
+ok("a trip that is only a night in the air has no cities yet", () => {
+  const t = flownTrip();
+  t.segments = [{ ...blankTransit(1) }];
+  assert.equal(citiesLocked(t), false);
+  assert.equal(phaseState(t, "cities"), "empty");
 });
 
 console.log(`\n${pass} checks passed\n`);

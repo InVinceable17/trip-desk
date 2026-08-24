@@ -490,8 +490,19 @@ export function moveSegment(segments, from, to) {
   return next;
 }
 
-export const citiesLocked = (t) =>
-  (t.segments || []).length > 0 && (t.segments || []).every((s) => s.locked);
+/**
+ * Have the cities been decided?
+ *
+ * Only cities can answer that. A night in the air has no dates to settle — the
+ * flight settles them — so it carries no lock, and counting it here means the
+ * phase can never read as done. That is a lock nobody can ever close.
+ */
+export const cityStops = (t) => (t.segments || []).filter((s) => !isTransitStop(t, s));
+
+export const citiesLocked = (t) => {
+  const stops = cityStops(t);
+  return stops.length > 0 && stops.every((s) => s.locked);
+};
 
 /**
  * Add a city. The first one takes the whole trip; later ones take whatever
@@ -529,6 +540,51 @@ export function resizeLast(segments, delta) {
 }
 
 /** What's wrong with the current city plan, in plain words. */
+/* ------------------------------------------------- flights vs the layout */
+/*
+   A trip is stated twice: once by the flights that carry you and once by the
+   dates and cities laid out against them. Both describe the same fortnight, so
+   they are checks on each other — and a disagreement between them is the thing
+   worth surfacing, because whichever one is wrong, something downstream is
+   built on it.
+
+   The chain is flights -> dates -> nights -> cities. The last three already
+   checked each other; this is the missing first link, and it is the one that
+   matters most, since the flights are the part you have actually paid for.
+*/
+
+/** The trip the flights describe: out on the first date, home on the last. */
+export function flightWindow(t) {
+  const f = bookedFlight(t) || leadFlight(t);
+  if (!f) return null;
+  const start = ISO.test((f.out || {}).date || "") ? f.out.date : "";
+  const end = ISO.test((f.ret || {}).date || "") ? f.ret.date : "";
+  return start && end ? { start, end } : null;
+}
+
+/**
+ * Where the two accounts differ, or null when they agree — or when there is
+ * not yet enough of either to compare, which is not a disagreement.
+ */
+export function datesDisagree(t) {
+  const flights = flightWindow(t);
+  if (!flights) return null;
+  const { start, end } = t.dates;
+  if (!ISO.test(start || "") || !ISO.test(end || "")) return null;
+  if (start === flights.start && end === flights.end) return null;
+  return {
+    trip: { start, end },
+    flights,
+    nights: { trip: nightsBetween(start, end), flights: nightsBetween(flights.start, flights.end) },
+  };
+}
+
+/** Take the flights' word for it. Explicit: nothing calls this on its own. */
+export function adoptFlightDates(t) {
+  const w = flightWindow(t);
+  return w ? { ...t, dates: { ...t.dates, start: w.start, end: w.end } } : t;
+}
+
 export function cityFlags(t) {
   const out = [];
   const total = tripNights(t);
@@ -543,9 +599,18 @@ export function cityFlags(t) {
     /* A night in the air has no city by definition; asking for one is noise. */
     if (!s.city.trim() && !isTransitStop(t, s)) out.push("A segment has no city yet.");
   });
-  const open = (t.segments || []).filter((s) => !s.locked).length;
-  if (t.segments.length && open) {
-    out.push(`${open} of ${t.segments.length} cities still unlocked.`);
+  const stops = cityStops(t);
+  const open = stops.filter((s) => !s.locked).length;
+  if (stops.length && open) {
+    out.push(`${open} of ${stops.length} cities still unlocked.`);
+  }
+
+  /* The flights and the layout are two accounts of one trip. */
+  const off = datesDisagree(t);
+  if (off) {
+    out.push(off.nights.trip === off.nights.flights
+      ? `Your flights run ${off.flights.start} to ${off.flights.end}; the trip is set to ${off.trip.start} to ${off.trip.end}.`
+      : `Your flights cover ${off.nights.flights} nights; the trip is laid out over ${off.nights.trip}.`);
   }
 
   const booked = bookedFlight(t);
@@ -747,7 +812,7 @@ export function phaseState(t, key) {
     }
     case "cities": {
       const total = tripNights(t);
-      if (!(t.segments || []).length) return "empty";
+      if (!cityStops(t).length) return "empty";
       // Nights adding up is not the same as having decided — a city counts
       // only once its dates are locked.
       const fits = !!total && assignedNights(t.segments) === total;

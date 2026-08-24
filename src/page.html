@@ -730,6 +730,9 @@ button.tl-day {
 .daynotes:disabled { color: var(--ink); opacity: 1; }
 .additems { opacity: .45; transition: opacity .12s ease; }
 .day.open:hover .additems, .additems:focus-within { opacity: 1; }
+/* An overnight leg is a bar, not a dot: it owns the night between two days. */
+.point.spans { justify-content: flex-start; padding-left: 8px; }
+.point.spans .pt-label { overflow: hidden; text-overflow: ellipsis; }
 .travellist { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
 .legcard {
   display: flex; align-items: center; gap: 5px 10px; flex-wrap: wrap; align-content: flex-start;

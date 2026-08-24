@@ -310,8 +310,14 @@ export default function Timeline({ days, layers, holidays, offRange, footer, com
               pt.idx < 0 || pt.idx >= days.length ? null : (
                 <button
                   key={pt.key} type="button"
-                  className={`point ${pt.tone || ""}${pt.selected ? " selected" : ""}`}
-                  style={{ gridColumn: wholeDay(pt.idx) }}
+                  className={`point ${pt.tone || ""}${pt.selected ? " selected" : ""}${pt.endIdx > pt.idx ? " spans" : ""}`}
+                  /* Midday to midday when it crosses a night, so the chip
+                     visibly straddles the boundary the way the flight does. */
+                  style={{
+                    gridColumn: pt.endIdx > pt.idx
+                      ? `${colMid(pt.idx)} / ${colMid(pt.endIdx)}`
+                      : wholeDay(pt.idx),
+                  }}
                   title={pt.title} onClick={pt.onClick} aria-pressed={!!pt.selected}
                 >
                   <span className="pt-glyph" aria-hidden="true">{pt.glyph}</span>

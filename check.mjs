@@ -464,6 +464,22 @@ check("and it offers no day trip and no lock",
 check("it never says you arrived anywhere",
   !!airRow && !/arrive/i.test(airRow.text), airRow);
 
+/* The overnight leg is the one thing on the Travel row that is not an instant.
+   Drawn inside a single column, the night it consumes is invisible. */
+/* Width alone cannot tell them apart — midday-to-midday is also one day wide.
+   What separates them is how many days each one touches. */
+const daysTouched = () => p3.evaluate(() => {
+  const heads = [...document.querySelectorAll(".ribbon .tl-row.head .tl-day")]
+    .map((h) => h.getBoundingClientRect());
+  return [...document.querySelectorAll(".ribbon .point")].map((pt) => {
+    const r = pt.getBoundingClientRect();
+    return heads.filter((h) => r.left < h.right && r.right > h.left).length;
+  });
+});
+const touched = await daysTouched();
+check("an overnight leg is drawn across the night it crosses", touched[0] === 2, touched);
+check("a same-day leg still sits inside its own day", touched[touched.length - 1] === 1, touched);
+
 /* The Gantt files it the same way: the Cities lane draws nothing for it. */
 check("the cities lane of the calendar draws no bar for it", await p3.evaluate(() => {
   const row = [...document.querySelectorAll(".ribbon .tl-row.seg-row")][0];

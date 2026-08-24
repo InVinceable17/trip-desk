@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { label as dayLabel, ISO } from "../flights.js";
-import { nightsBetween, ptoNote, assignedNights } from "../model.js";
+import { nightsBetween, ptoNote, assignedNights, datesDisagree, adoptFlightDates } from "../model.js";
 import { Field, Btn, Card } from "../components/ui.jsx";
 
 /* Phase 1. A soft window comes in; locked start and end dates go out. */
@@ -20,6 +20,10 @@ export default function Dates({ trip, update, readOnly }) {
     + Object.values(trip.days || {}).filter((d) => d && ((d.items || []).length || d.notes)).length;
 
   const setWindow = (patch) => update((t) => ({ ...t, window: { ...t.window, ...patch } }));
+
+  /* The flights and the layout are two accounts of the same trip; where they
+     disagree, the flights are the half you have already paid for. */
+  const off = datesDisagree(trip);
 
   const lock = () => update((t) => ({ ...t, dates: { ...t.dates, locked: true } }));
   const unlock = () => update((t) => ({ ...t, dates: { ...t.dates, locked: false } }));
@@ -50,6 +54,18 @@ export default function Dates({ trip, update, readOnly }) {
           </Field>
         </div>
       </Card>
+
+      {off && (
+        <div className="banner warn offer">
+          <span>
+            Your flights run {dayLabel(off.flights.start)} → {dayLabel(off.flights.end)}
+            {" "}({off.nights.flights} nights); the trip is laid out
+            {" "}{dayLabel(off.trip.start)} → {dayLabel(off.trip.end)} ({off.nights.trip}).
+          </span>
+          <Btn className="sm" kind="solid" disabled={readOnly}
+            onClick={() => update((t) => adoptFlightDates(t))}>Use the flight dates</Btn>
+        </div>
+      )}
 
       <Card title="Dates">
         {hasWindow ? (
