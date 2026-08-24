@@ -595,6 +595,15 @@ button.tl-day {
   border: 1px solid var(--line-soft); border-radius: 2px; padding: 7px 9px; background: var(--sunk);
 }
 .segcity { flex: 1 1 130px; max-width: 220px; }
+/* A transit stop has no city to type into — it reads as a fact, not a field. */
+.segcity.transit {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  padding: 4px 0;
+}
+.swatch-lg.ghost { background: none; box-shadow: inset 0 0 0 1px var(--line); }
+.banner.offer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.banner.offer > span { flex: 1 1 240px; }
 
 .segrow.locked { background: var(--good-soft); border-color: transparent; }
 .segrow.dragging { opacity: .4; }

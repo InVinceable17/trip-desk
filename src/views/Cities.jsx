@@ -3,7 +3,7 @@ import { label as dayLabel } from "../flights.js";
 import {
   tripDays, tripNights, assignedNights, segmentSpans, cityFlags,
   addSegment, moveSegment, segColor, bookedFlight,
-  cityPlan, setDayTrip, isTransitStop,
+  cityPlan, setDayTrip, isTransitStop, transitGap, addTransit,
 } from "../model.js";
 import { Btn, Card } from "../components/ui.jsx";
 
@@ -27,6 +27,8 @@ export default function Cities({ trip, update, readOnly }) {
   const spans = segmentSpans(trip);
   const flags = cityFlags(trip);
   const booked = bookedFlight(trip);
+  /* The night you are in the air, if nothing has claimed it yet. */
+  const gap = transitGap(trip);
 
   const setSegments = (next) =>
     update((t) => ({ ...t, segments: typeof next === "function" ? next(t.segments) : next }));
@@ -97,10 +99,22 @@ export default function Cities({ trip, update, readOnly }) {
           }}
         >⠿</button>
 
-        <span className="swatch-lg" style={{ background: segColor(i) }} aria-hidden="true" />
+        <span className={`swatch-lg${transit ? " ghost" : ""}`}
+          style={transit ? undefined : { background: segColor(i) }} aria-hidden="true" />
 
-        <input className="segcity" value={s.city} disabled={readOnly || s.locked} placeholder="City"
-          onChange={(e) => patch(s.id, { city: e.target.value })} />
+        {transit ? (
+          /* No city field, because there is no city. The leftover name from a
+             trip that predates typed segments is shown rather than hidden — it
+             is the user's text, and quietly swallowing it would be worse than
+             one line of clutter they can delete. */
+          <span className="segcity transit">
+            In the air
+            {s.city.trim() && <span className="muted"> · {s.city.trim()}</span>}
+          </span>
+        ) : (
+          <input className="segcity" value={s.city} disabled={readOnly || s.locked} placeholder="City"
+            onChange={(e) => patch(s.id, { city: e.target.value })} />
+        )}
 
         <div className="segnights">
           <Btn className="sm" disabled={readOnly || s.locked || s.nights <= 1}
@@ -171,7 +185,18 @@ export default function Cities({ trip, update, readOnly }) {
           </div>
         )}
 
-        {!trip.segments.length && (
+        {gap && (
+          <div className="banner note tight offer">
+            <span>
+              You take off {dayLabel(gap.date)} and land the next morning — that night is
+              spent in the air, and nothing has claimed it.
+            </span>
+            <Btn className="sm" kind="solid" disabled={readOnly}
+              onClick={() => update((t) => addTransit(t))}>Add the night</Btn>
+          </div>
+        )}
+
+        {!trip.segments.length && !gap && (
           <div className="empty">
             {days.length ? "Add your first city." : "Lock trip dates first."}
           </div>

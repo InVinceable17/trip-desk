@@ -413,8 +413,8 @@ const REDEYE = JSON.stringify({
   },
   travel: [], baseCurrency: "USD", rates: {},
   segments: [
-    { id: "sa", city: "Overnight to Rome", nights: 1, locked: true },
-    { id: "sb", city: "Rome", nights: 3, locked: true },
+    { id: "sa", city: "", nights: 1, locked: true, kind: "transit" },
+    { id: "sb", city: "Rome", nights: 3, locked: true, kind: "city" },
   ],
   stays: [], days: {},
   source: { kind: "", docUrl: "", docTitle: "", syncedAt: "", syncedBy: "", text: "", fields: {} },
@@ -439,7 +439,10 @@ const rowText = (city) => p3.evaluate((c) => {
   return r ? r.querySelector(".segdates").textContent.replace(/\s+/g, " ").trim() : null;
 }, city);
 
-const air = await rowText("Overnight to Rome");
+const air = await p3.evaluate(() => {
+  const r = [...document.querySelectorAll(".segrow")].find((x) => x.querySelector(".segcity.transit"));
+  return r ? r.querySelector(".segdates").textContent.replace(/\s+/g, " ").trim() : null;
+});
 check("the transit stop says it is in the air, not that you arrived",
   !!air && /In the air/.test(air) && !/Arrive/.test(air), air);
 check("and it still shows both ends of the night", !!air && /Oct 10/.test(air) && /Oct 11/.test(air), air);
@@ -448,6 +451,12 @@ const rome = await rowText("Rome");
 check("the city after it reads as a normal arrival, on the day the calendar says",
   !!rome && /Arrive/.test(rome) && /Oct 11/.test(rome), rome);
 
+check("it is not presented as a city at all", await p3.evaluate(() => {
+  const r = [...document.querySelectorAll(".segrow")].find((x) => x.querySelector(".segcity.transit"));
+  return !!r && !r.querySelector("input.segcity") && /In the air/.test(r.textContent);
+}));
+check("the offer is gone once the night is accounted for",
+  (await p3.locator(".banner.offer").count()) === 0);
 check("no day trip is offered out of a plane", await p3.evaluate(() => {
   const r = [...document.querySelectorAll(".segrow")].find((x) => /In the air/.test(x.textContent));
   const btn = r && [...r.querySelectorAll("button")].find((x) => /day trip/i.test(x.textContent));
@@ -458,6 +467,34 @@ check("but the real city still offers one", await p3.evaluate(() => {
   const btn = r && [...r.querySelectorAll("button")].find((x) => /day trip/i.test(x.textContent));
   return !!btn && !btn.disabled;
 }));
+/* And the same trip with the night unaccounted for offers to add it. */
+const GAPPED = REDEYE.replace(
+  '{"id":"sa","city":"","nights":1,"locked":true,"kind":"transit"},',
+  "").replace('"nights":3', '"nights":4');
+const server4 = await serve(8813, {
+  "data/index.json": JSON.stringify({ schema: 2, order: ["trip_red"], trips: [{ id: "trip_red", name: "Italy" }], prefs: {} }),
+  "data/trips/trip_red.json": GAPPED,
+});
+const p4 = await b.newPage({ viewport: { width: 1280, height: 1100 } });
+p4.on("pageerror", (e) => errs.push("gap pageerror: " + e.message));
+await p4.addInitScript(() => { window.__pub = []; window.claude = { use: async () => null }; });
+await p4.goto("http://localhost:8813/", { waitUntil: "load" });
+await p4.waitForTimeout(900);
+await p4.click(".tripmain");
+await p4.waitForTimeout(400);
+await p4.click(".step:has-text('Cities')");
+await p4.waitForTimeout(400);
+check("an unaccounted night in the air is offered, not silently absorbed",
+  (await p4.locator(".banner.offer").count()) === 1,
+  await p4.textContent(".banner.offer").catch(() => "no offer"));
+const segsBefore = await p4.locator(".segrow").count();
+await p4.click(".banner.offer button:has-text('Add the night')");
+await p4.waitForTimeout(500);
+check("accepting it adds one row, typed as transit",
+  (await p4.locator(".segrow").count()) === segsBefore + 1
+  && (await p4.locator(".segcity.transit").count()) === 1);
+check("and the offer withdraws", (await p4.locator(".banner.offer").count()) === 0);
+server4.close();
 server3.close();
 
 await p.screenshot({ path: "shot-days.png", fullPage: true });

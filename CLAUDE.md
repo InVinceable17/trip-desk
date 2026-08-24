@@ -104,14 +104,23 @@ the trip's start date or the nights of what precedes it. The ribbon and the
 Cities list both read that one function, so they cannot disagree about a date;
 if they *look* like they disagree, it is the wording.
 
-**A night in the air is a stop, but not an arrival.** The overnight flight owns
-a night, so it needs a segment to hold it — and `isTransitStop()` is how you
-tell that segment from a city. The Cities row used to say "Arrive Oct 10" of
-it, which is false on its own terms and worse when the stop is named for where
-it is going ("Overnight to Rome"), because the row then reads as Rome starting
-a day earlier than the calendar directly above it. Stays already knew about
-transit stops; Cities did not. Anywhere a segment is described to a person,
-check `isTransitStop` first.
+**A night in the air is a stop, but not a city.** Every night of the trip
+belongs to exactly one segment — that invariant is what makes the calendar
+arithmetic work, and it is right. What was wrong is that segments were
+*implicitly typed as cities*, so the only way to account for the night you
+spend flying was to invent a place ("Overnight to Rome") and then infer
+backwards that it was not one. Segments now carry `kind: "city" | "transit"`,
+and `transitGap()` offers the night when a booked leg lands the day after it
+departs, so nobody has to hand-craft a stub. Anywhere a segment is described
+to a person, check `isTransitStop` first.
+
+**`blankSegment` must not default `kind`.** `hydrateTrip` spreads it over every
+stored segment, so a default there is not a default — it is a rewrite of every
+trip already saved, and it stamps `"city"` onto exactly the one-night stop
+under an overnight flight that the type exists for. Absent means "infer", the
+inference lives in `isTransitStop`, and anything the app creates
+(`addSegment`, `blankTransit`) declares itself. A test asserts hydrate leaves
+`kind` undefined; if it ever starts stamping one, that is the bug.
 
 **A hotel renamed in the doc reads as a different hotel.** The doc has no ids,
 so a rename and a replacement are the same edit. Both survive; you delete the

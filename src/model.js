@@ -52,8 +52,27 @@ const uid = (p) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).
 
 /* ----------------------------------------------------------------- shapes */
 
+/* A stretch of nights spent in one place. `kind` is the whole point of this
+   being typed: every night of the trip belongs to exactly one segment, and
+   some of those nights are spent in a seat rather than a bed. Before this
+   existed the only way to satisfy that invariant was to invent a city called
+   something like "Overnight to Rome" — a place that is not a place, which
+   every reader then had to decode again. */
+export const SEGMENT_KINDS = ["city", "transit"];
+
 export const blankSegment = (city = "", nights = 1) => ({
+  /* No `kind` here on purpose. hydrateTrip spreads blankSegment over every
+     stored segment, so a default would stamp "city" onto trips saved before
+     this existed — including the one-night stop under an overnight flight
+     that is the whole reason for the type. Absent means "work it out", and
+     the inference in isTransitStop is what works it out. A segment the app
+     creates says what it is; see addSegment and blankTransit. */
   id: uid("seg"), city, nights: Math.max(1, nights), locked: false,
+});
+
+/** A night under way: no city, no bed, nothing to see. */
+export const blankTransit = (nights = 1) => ({
+  id: uid("seg"), city: "", nights: Math.max(1, nights), locked: false, kind: "transit",
 });
 
 export const blankTravel = (kind = "train") => ({
@@ -275,11 +294,46 @@ export function segmentSpans(t) {
  * day the stop begins, not the day it ends, so `plusOne` is false and you do
  * still need a bed.
  */
+/**
+ * Is this stretch time under way rather than a stay?
+ *
+ * The declared kind wins. The old inference is kept underneath it because
+ * trips saved before segments were typed encode exactly this case as a
+ * one-night "city" sitting under an overnight leg — reading them correctly
+ * costs one condition and saves a migration that could only guess.
+ */
 export function isTransitStop(t, seg) {
   if (!seg) return false;
+  if (seg.kind === "transit") return true;
+  if (seg.kind === "city") return false;
   const span = segmentSpans(t).find((s) => s.seg.id === seg.id);
   if (!span || span.nights !== 1) return false;
   return travelLegs(t).some((L) => L.plusOne && L.date === span.startDate);
+}
+
+/**
+ * A night the trip contains and nobody has accounted for: you take off on the
+ * first day and land on the second, so that night is spent in the air, but no
+ * segment says so. Returns the leg responsible, or null.
+ *
+ * Only the departure night is offered. An overnight leg in the middle of a
+ * trip would have to split a stay in two, which is a different and much less
+ * obvious edit — better left to the person than guessed at.
+ */
+export function transitGap(t) {
+  const start = t.dates.start;
+  if (!ISO.test(start || "")) return null;
+  const leg = travelLegs(t).find((L) => L.plusOne && L.date === start);
+  if (!leg) return null;
+  const first = (t.segments || [])[0];
+  if (first && isTransitStop(t, first)) return null;
+  return leg;
+}
+
+/** Put the unaccounted night at the front, as itself. */
+export function addTransit(t) {
+  if (!transitGap(t)) return t;
+  return { ...t, segments: [blankTransit(1), ...(t.segments || [])] };
 }
 
 /**
@@ -441,10 +495,10 @@ export const citiesLocked = (t) =>
 export function addSegment(segments, city, totalNights) {
   const name = (city || "").trim();
   if (!name) return segments;
-  if (!segments.length) return [blankSegment(name, Math.max(1, totalNights || 1))];
+  if (!segments.length) return [{ ...blankSegment(name, Math.max(1, totalNights || 1)), kind: "city" }];
 
   const spare = (totalNights || 0) - assignedNights(segments);
-  if (spare > 0) return [...segments, blankSegment(name, spare)];
+  if (spare > 0) return [...segments, { ...blankSegment(name, spare), kind: "city" }];
 
   // Borrow from whichever stop has the most nights to spare — taking from the
   // last one runs out after a single city.
@@ -453,10 +507,10 @@ export function addSegment(segments, city, totalNights) {
   if (donor >= 0) {
     return [
       ...segments.map((s, n) => (n === donor ? { ...s, nights: (+s.nights || 0) - 1 } : s)),
-      blankSegment(name, 1),
+      { ...blankSegment(name, 1), kind: "city" },
     ];
   }
-  return [...segments, blankSegment(name, 1)]; // every stop is down to one night; go over and flag it
+  return [...segments, { ...blankSegment(name, 1), kind: "city" }]; // every stop is down to one night; go over and flag it
 }
 
 /** Grow or shrink the last segment — the only edit that changes the total. */
@@ -479,7 +533,10 @@ export function cityFlags(t) {
       ? `${total - got} night${total - got === 1 ? "" : "s"} unassigned.`
       : `${got - total} night${got - total === 1 ? "" : "s"} more than the trip is long.`);
   }
-  (t.segments || []).forEach((s) => { if (!s.city.trim()) out.push("A segment has no city yet."); });
+  (t.segments || []).forEach((s) => {
+    /* A night in the air has no city by definition; asking for one is noise. */
+    if (!s.city.trim() && !isTransitStop(t, s)) out.push("A segment has no city yet.");
+  });
   const open = (t.segments || []).filter((s) => !s.locked).length;
   if (t.segments.length && open) {
     out.push(`${open} of ${t.segments.length} cities still unlocked.`);

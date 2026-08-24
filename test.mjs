@@ -200,6 +200,7 @@ import {
   segmentSpans, cityForDay, moveBoundary, resizeLast, assignedNights,
   cityFlags, tripCost, phaseState, openBookings, indexEntry, blankSegment,
   blankStay, blankItem, isTransitStop, unplannedMoves, nightsBetween,
+  blankTransit, transitGap, addTransit,
 } from "./src/model.js";
 
 /* The exact shape the live v1 artifact stores. */
@@ -1278,6 +1279,122 @@ ok("and it reads back the hotel address it just wrote", () => {
   ].join(String.fromCharCode(10)));
   assert.equal(parsed.stays.length, 1);
   assert.equal(parsed.stays[0].address, "Via Silvio Spaventa, 29, - 80142 Napoli");
+});
+
+/* ------------------------------------------------------- nights under way */
+/* Every night of a trip belongs to exactly one segment, and some of them are
+   spent in a seat. Before segments were typed, the only way to satisfy that
+   was to invent a city — so these are about the type carrying the meaning
+   instead of a name having to imply it. */
+
+console.log("\nnights under way");
+
+/* Leaves on the 10th, lands on the 11th: the night of the 10th is in the air. */
+const redeye = () => {
+  const t = blankTrip("Italy");
+  t.dates = { start: "2026-10-10", end: "2026-10-14", locked: true };
+  t.flights.options = [{
+    id: "o1", status: "Booked",
+    out: { date: "2026-10-10", from: "ATL", to: "FCO", depart: "16:35", arrive: "07:35", plusOne: true },
+    ret: { date: "2026-10-14", from: "FCO", to: "ATL", depart: "09:05", arrive: "14:39", plusOne: false },
+  }];
+  t.flights.bookedId = "o1";
+  t.segments = [{ ...blankSegment("Rome", 3) }];
+  return t;
+};
+
+ok("a night nobody has claimed is offered, and names the leg responsible", () => {
+  const leg = transitGap(redeye());
+  assert.ok(leg, "expected a gap");
+  assert.equal(leg.date, "2026-10-10");
+});
+ok("accepting it puts the night at the front, as itself", () => {
+  const t = addTransit(redeye());
+  assert.equal(t.segments.length, 2);
+  assert.equal(t.segments[0].kind, "transit");
+  assert.equal(t.segments[0].city, "");
+  assert.equal(t.segments[0].nights, 1);
+  assert.equal(t.segments[1].city, "Rome");
+});
+ok("and then it stops being offered", () => {
+  assert.equal(transitGap(addTransit(redeye())), null);
+});
+ok("accepting twice is not two nights in the air", () => {
+  assert.equal(addTransit(addTransit(redeye())).segments.length, 2);
+});
+ok("nothing is offered when the flight lands the day it left", () => {
+  const t = redeye();
+  t.flights.options[0].out.plusOne = false;
+  assert.equal(transitGap(t), null);
+});
+ok("the declared kind decides, without consulting the flights", () => {
+  const t = blankTrip("X");
+  t.dates = { start: "2026-10-10", end: "2026-10-14", locked: true };
+  t.segments = [{ ...blankTransit(1) }, { ...blankSegment("Rome", 3) }];
+  assert.equal(isTransitStop(t, t.segments[0]), true);
+  assert.equal(isTransitStop(t, t.segments[1]), false);
+});
+ok("a one-night city under an overnight leg stays a city once it says so", () => {
+  const t = redeye();
+  // The shape the old inference calls transit. Undeclared, it is inferred as
+  // one; declared a city, the declaration wins and the guess is not consulted.
+  t.segments = [{ ...blankSegment("Reykjavik", 1) }, { ...blankSegment("Rome", 2) }];
+  assert.equal(isTransitStop(t, t.segments[0]), true, "undeclared, the guess stands");
+  t.segments[0].kind = "city";
+  assert.equal(isTransitStop(t, t.segments[0]), false, "declared, the guess is overruled");
+});
+ok("a trip saved before segments were typed still reads correctly", () => {
+  const t = redeye();
+  // No `kind` at all, exactly as it sits in storage today.
+  t.segments = [
+    { id: "old1", city: "Overnight to Rome", nights: 1, locked: true },
+    { id: "old2", city: "Rome", nights: 3, locked: true },
+  ];
+  assert.equal(isTransitStop(t, t.segments[0]), true);
+  assert.equal(isTransitStop(t, t.segments[1]), false);
+  assert.equal(transitGap(t), null, "it is already accounted for, so nothing is offered");
+});
+ok("hydrate must NOT stamp a kind onto a stored segment", () => {
+  /* It spreads blankSegment over every saved segment, so a default there would
+     rewrite every trip on load — turning the one-night stop under an overnight
+     flight back into a city and silently undoing the whole point. */
+  const h = hydrateTrip({ ...blankTrip("X"), segments: [{ id: "s1", city: "Rome", nights: 2 }] });
+  assert.equal(h.segments[0].kind, undefined);
+  assert.equal(h.segments[0].city, "Rome");
+});
+ok("a legacy transit stop survives a hydrate", () => {
+  const t = redeye();
+  t.segments = [
+    { id: "old1", city: "Overnight to Rome", nights: 1, locked: true },
+    { id: "old2", city: "Rome", nights: 3, locked: true },
+  ];
+  const h = hydrateTrip(t);
+  assert.equal(isTransitStop(h, h.segments[0]), true);
+  assert.equal(transitGap(h), null);
+});
+ok("a city the app creates says so, so it is never re-inferred", () => {
+  assert.equal(addSegment([], "Rome", 3)[0].kind, "city");
+  assert.equal(addSegment([{ ...blankSegment("Rome", 2) }], "Florence", 4)[1].kind, "city");
+});
+ok("a night in the air is never nagged for a city name", () => {
+  const t = addTransit(redeye());
+  assert.ok(!cityFlags(t).some((f) => /no city/i.test(f)), cityFlags(t).join(" | "));
+  // A real city with no name still is.
+  t.segments.push({ ...blankSegment("", 1) });
+  assert.ok(cityFlags(t).some((f) => /no city/i.test(f)), cityFlags(t).join(" | "));
+});
+ok("it still owns its night, so the nights continue to add up", () => {
+  const t = addTransit(redeye());
+  assert.equal(assignedNights(t.segments), 4);
+  assert.equal(tripNights(t), 4);
+  const spans = segmentSpans(t);
+  assert.equal(spans[0].startDate, "2026-10-10");
+  assert.equal(spans[1].startDate, "2026-10-11");
+  assert.equal(spans[1].seg.city, "Rome");
+});
+ok("and it wants no bed", () => {
+  const t = addTransit(redeye());
+  assert.equal(isTransitStop(t, t.segments[0]), true);
 });
 
 console.log(`\n${pass} checks passed\n`);
