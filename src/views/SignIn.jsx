@@ -9,11 +9,15 @@ export default function SignIn({ auth, describeError }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const go = async () => {
+  /* Not async before the call: signIn() has to open its popup inside the click
+     that triggered it, or Safari treats the window as unsolicited and blocks
+     it. Awaiting anything first — even a state update that settles — is enough
+     to lose the gesture. */
+  const go = () => {
     setBusy(true); setErr("");
-    try { await auth.signIn(); }
-    catch (e) { setErr(describeError ? describeError(e) : (e.message || "Sign-in failed.")); }
-    setBusy(false);
+    auth.signIn()
+      .catch((e) => setErr(describeError ? describeError(e) : (e.message || "Sign-in failed.")))
+      .finally(() => setBusy(false));
   };
 
   return (

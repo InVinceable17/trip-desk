@@ -62,6 +62,15 @@ if (configured) {
   check("and disables the button rather than failing on click", disabled === true);
 }
 
+/* The redirect flow cannot complete in this deployment: the app is served from
+   github.io while the auth handler lives on <project>.firebaseapp.com, and
+   modern browsers partition the storage the handler needs to match its result
+   against the pending sign-in. It fails by stranding you on a blank page
+   holding a valid Google authorisation code — the least debuggable failure
+   available — so the call must not come back. */
+const bundle = await (await fetch("http://localhost:8833/index.html")).text();
+check("sign-in does not fall back to the redirect flow", !/signInWithRedirect\s*\(/.test(bundle));
+
 console.log("\npwa");
 const man = JSON.parse(await (await fetch("http://localhost:8833/manifest.webmanifest")).text());
 check("manifest names the app and can be installed",
