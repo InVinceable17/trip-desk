@@ -190,6 +190,49 @@ const sleeping = await p.evaluate(() => {
 check("the hotels layer still reads City — Hotel, untouched by the day trip",
   !!sleeping && sleeping.includes("Rome") && sleeping.includes("Hotel Artemide"), sleeping);
 
+console.log("\nthe itinerary drawer");
+/* It has to be reachable from wherever you are, it has to leave the app
+   underneath usable, and — the whole reason it exists — it has to already
+   show an edit by the time you look up from making it. */
+check("closed to begin with", await p.evaluate(
+  () => !document.querySelector(".docdrawer").classList.contains("open")));
+await p.click(".link:has-text('itinerary')");
+await p.waitForTimeout(400);
+check("the header pulls it up", await p.evaluate(
+  () => document.querySelector(".docdrawer").classList.contains("open")));
+check("it is actually on screen, not just flagged open", await p.evaluate(() => {
+  const r = document.querySelector(".docdrawer").getBoundingClientRect();
+  return r.width > 200 && r.right <= innerWidth + 2 && r.left < innerWidth - 100;
+}));
+check("it renders the doc's own day headings", await p.evaluate(
+  () => /DAY 1 - \w+ [A-Z]+ \d+/.test(document.querySelector(".docdrawer").textContent)),
+  await p.textContent(".sd-day"));
+check("there is no backdrop, so the app underneath stays usable",
+  (await p.locator(".docdrawer ~ .backdrop, .sheet").count()) === 0);
+
+/* The claim under test: no caching, no refresh, no invalidation. */
+const dayLine = () => p.evaluate(() => {
+  const heads = [...document.querySelectorAll(".docdrawer .sd-day")];
+  const h = heads.find((x) => /OCTOBER 13/.test(x.textContent));
+  const out = [];
+  let n = h && h.nextElementSibling;
+  while (n && n.classList.contains("sd-b")) { out.push(n.textContent); n = n.nextElementSibling; }
+  return out.join(" | ");
+});
+const docBefore = await dayLine();
+await p.click(".step:has-text('Days')");
+await p.waitForTimeout(350);
+await p.fill(".day:nth-child(2) .daynotes", "Ancient Rome");
+await p.waitForTimeout(400);
+const docAfter = await dayLine();
+check("an edit shows in the drawer without reopening it",
+  docAfter !== docBefore && /Ancient Rome/.test(docAfter), { docBefore, docAfter });
+
+await p.click(".link:has-text('itinerary')");
+await p.waitForTimeout(300);
+check("and it folds away again", await p.evaluate(
+  () => !document.querySelector(".docdrawer").classList.contains("open")));
+
 console.log("\nlocking days");
 check("days step is not done with one day filled in",
   (await p.evaluate(() => document.querySelector(".step:nth-child(5)").className)).includes("started"));

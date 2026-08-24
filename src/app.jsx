@@ -28,8 +28,6 @@ const VIEWS = { dates: Dates, flights: Flights, cities: Cities, stays: Stays, da
 
 function parseHash() {
   if (/^#\/backup/.test(location.hash || "")) return { view: "backup" };
-  const o = /^#\/out\/([^/]+)/.exec(location.hash || "");
-  if (o) return { view: "output", id: o[1] };
   const m = /^#\/t\/([^/]+)(?:\/([^/]+))?/.exec(location.hash || "");
   if (!m) return { view: "trips" };
   return { view: "trip", id: m[1], phase: PHASE_KEYS.includes(m[2]) ? m[2] : "dates" };
@@ -58,6 +56,9 @@ function App() {
   const [mcp, setMcp] = useState(undefined);
   const [saving, setSaving] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
+  /* Lives in App, not in a phase view, so it stays open while you move between
+     phases — the whole point is watching a change land while you make it. */
+  const [docOpen, setDocOpen] = useState(false);
   const [user, setUser] = useState(auth.enabled ? undefined : null);  // undefined = still deciding
 
   const saver = useRef(null);
@@ -179,7 +180,7 @@ function App() {
   if (!db) return <div className="boot"><Spinner /> Opening your trips…</div>;
 
   const readOnly = mode === MODE.READONLY;
-  const trip = route.view === "trip" || route.view === "output" ? db.trips[route.id] : null;
+  const trip = route.view === "trip" ? db.trips[route.id] : null;
   const who = (user && (user.displayName || user.email)) || "";
 
   return (
@@ -190,6 +191,8 @@ function App() {
         onRename={(name) => updateTrip(trip.id, (t) => ({ ...t, name }))}
         onCost={() => setCostOpen((v) => !v)}
         costOpen={costOpen}
+        onDoc={() => setDocOpen((v) => !v)}
+        docOpen={docOpen}
         readOnly={readOnly}
       />
 
@@ -209,9 +212,6 @@ function App() {
         <Backup db={db} readOnly={readOnly} onRestore={restoreAll} />
       )}
 
-      {route.view === "output" && trip && (
-        <Output trip={trip} onBack={() => go(`#/t/${trip.id}/days`)} />
-      )}
 
       {route.view === "trips" && (
         <Trips
@@ -251,6 +251,10 @@ function App() {
         </>
       )}
 
+      {trip && (
+        <Output trip={trip} open={docOpen} onClose={() => setDocOpen(false)} />
+      )}
+
       <footer className="foot">
         {mode === MODE.SAVING ? (saving ? "Saving…" : "Saved")
           : mode === MODE.READONLY ? "Read-only"
@@ -267,7 +271,7 @@ function PhaseView({ phase, ...props }) {
 
 /* ----------------------------------------------------------------- header */
 
-function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, readOnly }) {
+function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, onDoc, docOpen, readOnly }) {
   const [editing, setEditing] = useState(false);
   const cost = trip ? tripCost(trip) : null;
   const nights = trip ? tripNights(trip) : 0;
@@ -320,7 +324,8 @@ function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, readOn
                 ) : <span className="muted">no costs yet</span>}
                 <span className="caret" aria-hidden="true">{costOpen ? "▴" : "▾"}</span>
               </button>
-              <button className="link" onClick={() => go(`#/out/${trip.id}`)}>itinerary</button>
+              <button className={`link${docOpen ? " on" : ""}`} onClick={onDoc}
+                aria-expanded={docOpen}>itinerary</button>
               <button className="link" onClick={() => go("#/backup")}>backups</button>
             </div>
           </>

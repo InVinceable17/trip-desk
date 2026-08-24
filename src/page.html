@@ -845,9 +845,9 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   background: var(--card); border: 1px solid var(--line); border-radius: 2px;
   box-shadow: var(--shadow);
   padding: 44px 52px 56px;
-  /* `width` is not optional here. The parent is a flex column, and an auto
-     cross-axis margin cancels the default stretch — the page would size to its
-     longest line (411px of "DAY 1 - SAT OCTOBER 10") instead of to 760. */
+  /* `width` is not optional. An auto cross-axis margin cancels a flex
+     parent's default stretch, and the page would size to its longest line
+     (411px of "DAY 1 - SAT OCTOBER 10") instead of filling the drawer. */
   width: 100%; max-width: 760px; margin: 0 auto;
   font-family: Georgia, "Times New Roman", Cambria, serif;
   font-size: 15px; line-height: 1.55; color: var(--ink);
@@ -889,6 +889,72 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   .sheet-doc { border: 0; box-shadow: none; max-width: none; padding: 0; }
   .sd-day { break-after: avoid; }
   .sd-b { break-inside: avoid; }
+}
+
+
+/* --------------------------------------------------------------- itinerary */
+/* The planning doc, over the right edge, pullable at any time.
+   No backdrop and nothing to dismiss: the reason to open it is to watch a
+   change land as you make it, so the app underneath has to stay live. On a
+   wide screen the body gives up the width instead of hiding under it. */
+:root { --drawer: 520px; }
+
+.docdrawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
+  width: min(var(--drawer), 94vw);
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: -8px 0 24px rgba(16, 24, 32, .10);
+  transform: translateX(101%);
+  transition: transform .18s ease;
+  visibility: hidden;
+}
+.docdrawer.open { transform: none; visibility: visible; }
+
+@media (prefers-reduced-motion: reduce) {
+  .docdrawer { transition: none; }
+}
+
+/* Slide the page over rather than covering it — but only where there is room
+   to give. Below this the drawer simply sits on top. */
+@media (min-width: 1180px) {
+  /* Keep the body's own 16px gutter — setting padding-right replaces it, and
+     the app's right edge ends up flush against the drawer. */
+  body.doc-open { padding-right: calc(var(--drawer) + 16px); }
+}
+
+.dd-bar {
+  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+.dd-count { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.dd-body { flex: 1 1 auto; overflow-y: auto; padding: 16px 14px 28px; }
+.dd-body .sheet-doc { padding: 30px 32px 36px; }
+
+.link.on { color: var(--accent-ink); border-color: var(--accent); }
+
+@media (max-width: 768px) {
+  .docdrawer { width: 100vw; }
+  .dd-bar { padding: 12px 14px calc(12px + env(safe-area-inset-top)); }
+  .dd-body {
+    padding: 12px 12px calc(28px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Printing wants the document and nothing else — including none of the app
+   still sitting behind the drawer. */
+@media print {
+  body.doc-open > .wrap { display: none !important; }
+  .docdrawer {
+    position: static; transform: none; visibility: visible;
+    width: auto; border: 0; box-shadow: none; background: #fff;
+  }
+  .dd-bar { display: none !important; }
+  .dd-body { overflow: visible; padding: 0; }
 }
 
 /* ------------------------------------------------------------ doc source */

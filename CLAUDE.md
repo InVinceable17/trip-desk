@@ -33,8 +33,22 @@ never run here at all.
 ## Writing the doc back out
 
 `src/doc-emit.js` is the mirror of `doc-parse.js`: it renders the trip in the
-planning doc's own format, and `views/Output.jsx` (`#/out/<id>`, the
-**itinerary** link in the header) shows it with a copy button. The format is
+planning doc's own format, and `views/Output.jsx` shows it in a drawer over the
+right edge, opened by the **itinerary** button in the header.
+
+**It is a drawer, not a page, and it has no backdrop.** The reason to open it is
+to watch a change land while you make it, so the app underneath has to stay
+live and the state lives in `App` — not in a phase view — or it would close
+every time you changed phase. Above 1180px `body.doc-open` gives up the width
+so the app slides over instead of hiding beneath it; use
+`calc(var(--drawer) + 16px)` or you replace the body's own gutter and the app's
+right edge sits flush against the drawer.
+
+**Nothing keeps it in sync, and nothing needs to.** `blocks()` is a pure
+function of the trip, rendered during App's render, and every edit goes through
+`updateTrip` — so the keystroke and the line it rewrites land in the same
+paint. There is no cache and nothing to invalidate. `check.mjs` types into a
+day note with the drawer open and asserts the document changed. The format is
 copied from the real doc — `DAY 1 - SAT OCTOBER 10`, asterisk bullets, hotels
 indented three spaces beneath — including the abbreviations `TUES` and `THUR`,
 which are hers and not the standard ones.
