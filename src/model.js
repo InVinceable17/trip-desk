@@ -258,6 +258,28 @@ export function segmentSpans(t) {
 }
 
 /**
+ * A stop you sleep *on the way to* rather than *in* — one night, spanned end to
+ * end by a leg that leaves the day it starts and lands the day it ends. An
+ * overnight flight, a night train, a ferry. There is no bed to book for it, so
+ * the Stays phase must not sit at "started" waiting for one.
+ *
+ * Derived rather than flagged, for the same reason `dayStay` is: a stored
+ * boolean would have to be kept in step with the travel it describes, and the
+ * travel already says it. `plusOne` is the whole tell — it is what "lands the
+ * next day" means, and both flight legs and `trip.travel` carry it.
+ *
+ * A one-night city you fly into and out of is not this: that leg lands on the
+ * day the stop begins, not the day it ends, so `plusOne` is false and you do
+ * still need a bed.
+ */
+export function isTransitStop(t, seg) {
+  if (!seg) return false;
+  const span = segmentSpans(t).find((s) => s.seg.id === seg.id);
+  if (!span || span.nights !== 1) return false;
+  return travelLegs(t).some((L) => L.plusOne && L.date === span.startDate);
+}
+
+/**
  * Where you wake and where you sleep on a given day. A stop of N nights that
  * arrives on day D has you sleeping there D..D+N-1 and waking there D+1..D+N —
  * so the day a new stop begins is a TRAVEL DAY: you wake in the old city and
@@ -300,6 +322,25 @@ export function travelDays(t) {
 
 /** Any movement recorded on a given date. */
 export const travelOn = (t, iso) => travelLegs(t).filter((L) => L.date === iso);
+
+/**
+ * Moves you have not arranged yet — the gap between "we're going to Florence on
+ * the 14th" and "we have seats on a train".
+ *
+ * Every change of city needs its own way of getting there, with two things that
+ * don't count: a move a flight already makes for you (the day you land, which
+ * is a move from nowhere into your first city), and a leg that exists but is
+ * still only a plan. An unbooked train is exactly the case this is for — the
+ * date is decided and the seats are not.
+ */
+export function unplannedMoves(t) {
+  const legs = travelLegs(t);
+  const dayBefore = (iso) => (ISO.test(iso || "") ? fromUTC(toUTC(iso) - 86400000) : "");
+  const flownInto = (iso) => legs.some((L) => L.kind === "flight"
+    && (L.date === iso || (L.plusOne && L.date === dayBefore(iso))));
+  const arranged = (iso) => (t.travel || []).some((x) => x.date === iso && x.booked);
+  return travelDays(t).filter((d) => !flownInto(d.iso) && !arranged(d.iso));
+}
 
 /**
  * Where a given trip day is spent, and where you sleep that night — which are
@@ -630,8 +671,14 @@ export function phaseState(t, key) {
   switch (key) {
     case "dates":
       return t.dates.locked ? "done" : (t.window.start || t.dates.start) ? "started" : "empty";
-    case "flights":
-      return t.flights.bookedId ? "done" : (t.flights.options || []).length ? "started" : "empty";
+    case "flights": {
+      // Getting there is not the same as getting around. A booked flight with
+      // two unbooked trains under it is a trip you cannot actually take, so the
+      // phase stays open until every move between cities is arranged too.
+      if (!(t.flights.options || []).length && !(t.travel || []).length) return "empty";
+      if (!t.flights.bookedId) return "started";
+      return unplannedMoves(t).length ? "started" : "done";
+    }
     case "cities": {
       const total = tripNights(t);
       if (!(t.segments || []).length) return "empty";
@@ -641,7 +688,9 @@ export function phaseState(t, key) {
       return fits && citiesLocked(t) ? "done" : "started";
     }
     case "stays": {
-      const segs = t.segments || [];
+      // A night in the air is still a night of the trip, but it is not a night
+      // that wants a hotel — so a transit stop must not hold this phase open.
+      const segs = (t.segments || []).filter((s) => !isTransitStop(t, s));
       if (!(t.stays || []).length) return "empty";
       const covered = segs.length && segs.every((s) =>
         (t.stays || []).some((x) => x.segmentId === s.id && x.status === "Booked"));

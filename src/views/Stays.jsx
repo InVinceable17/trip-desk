@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { label as dayLabel } from "../flights.js";
-import { segmentSpans, blankStay, STAY_STATUSES, segColor, leadStay, nightsBetween, hotelsIn, mapsSearch, fmtMoney } from "../model.js";
+import { segmentSpans, blankStay, STAY_STATUSES, segColor, leadStay, nightsBetween, hotelsIn, mapsSearch, fmtMoney, isTransitStop } from "../model.js";
 import { Field, Btn, Card, Amount } from "../components/ui.jsx";
 
 /* Phase 4, deliberately plain. Candidate places per city segment, with
@@ -29,6 +29,26 @@ export default function Stays({ trip, update, readOnly }) {
         const list = trip.stays.filter((s) => s.segmentId === seg.id);
         const lead = leadStay(trip, seg.id);
         const nights = nightsBetween(startDate, endDate);
+
+        /* A night spent travelling has no bed to shortlist. Saying so is worth
+           a line — an empty hotel table here reads as something missing. */
+        if (isTransitStop(trip, seg)) {
+          return (
+            <Card
+              key={seg.id}
+              title={
+                <span className="segtitle">
+                  <span className="swatch-lg" style={{ background: segColor(i) }} aria-hidden="true" />
+                  {seg.city || "in transit"}
+                </span>
+              }
+              right={<span className="muted">{dayLabel(startDate)} overnight · no hotel needed</span>}
+            >
+              <div className="empty">You're travelling this night — nothing to book.</div>
+            </Card>
+          );
+        }
+
         return (
           <Card
             key={seg.id}

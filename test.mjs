@@ -199,7 +199,7 @@ import {
   blankTrip, hydrateTrip, migrateV1, tripDays, tripNights, ptoNote,
   segmentSpans, cityForDay, moveBoundary, resizeLast, assignedNights,
   cityFlags, tripCost, phaseState, openBookings, indexEntry, blankSegment,
-  blankStay, blankItem,
+  blankStay, blankItem, isTransitStop, unplannedMoves,
 } from "./src/model.js";
 
 /* The exact shape the live v1 artifact stores. */
@@ -407,6 +407,81 @@ ok("cities is only done when the nights add up", () => {
 });
 ok("cities that add up but aren't locked read as still in progress", () => {
   assert.equal(phaseState(trip(), "cities"), "started");
+});
+
+/* The real Italy shape: they leave Atlanta on the 10th and land on the 11th, so
+   the route opens with a night nobody sleeps in a city. */
+const redeyeTrip = () => {
+  const t = blankTrip("Italy");
+  t.dates = { start: "2026-10-10", end: "2026-10-23", locked: true }; // 13 nights
+  t.segments = [
+    { id: "s0", city: "Overnight to Rome", nights: 1, locked: true },
+    { id: "s1", city: "Rome", nights: 3, locked: true },
+    { id: "s2", city: "Florence", nights: 5, locked: true },
+    { id: "s3", city: "Naples", nights: 4, locked: true },
+  ];
+  t.flights.options = [{
+    id: "o1",
+    out: { date: "2026-10-10", from: "ATL", to: "FCO", depart: "16:35", arrive: "07:35", plusOne: true },
+    ret: { date: "2026-10-23", from: "NAP", to: "ATL", depart: "09:05", arrive: "14:39", plusOne: false },
+  }];
+  t.flights.bookedId = "o1";
+  t.travel = [
+    { id: "t1", kind: "train", date: "2026-10-14", from: "Rome", to: "Florence", booked: false },
+    { id: "t2", kind: "train", date: "2026-10-19", from: "Florence", to: "Naples", booked: false },
+  ];
+  t.stays = [
+    { id: "h1", segmentId: "s1", name: "Lancelot", status: "Booked" },
+    { id: "h2", segmentId: "s2", name: "Ginori", status: "Booked" },
+    { id: "h3", segmentId: "s3", name: "Odeon", status: "Booked" },
+  ];
+  return t;
+};
+
+ok("a night spanned by an overnight leg is a transit stop", () => {
+  const t = redeyeTrip();
+  assert.equal(isTransitStop(t, t.segments[0]), true);
+  assert.equal(isTransitStop(t, t.segments[1]), false);
+  assert.equal(isTransitStop(t, t.segments[3]), false);
+});
+ok("a one-night city you land in the same day still wants a bed", () => {
+  const t = blankTrip("Layover");
+  t.dates = { start: "2026-10-10", end: "2026-10-13", locked: true };
+  t.segments = [
+    { id: "s1", city: "Lisbon", nights: 1, locked: true },
+    { id: "s2", city: "Porto", nights: 2, locked: true },
+  ];
+  t.flights.options = [{
+    id: "o1",
+    out: { date: "2026-10-10", from: "ATL", to: "LIS", depart: "08:00", arrive: "18:00", plusOne: false },
+    ret: { date: "2026-10-13", from: "OPO", to: "ATL", depart: "10:00", arrive: "14:00", plusOne: false },
+  }];
+  t.flights.bookedId = "o1";
+  t.stays = [{ id: "h1", segmentId: "s2", name: "Porto place", status: "Booked" }];
+  assert.equal(isTransitStop(t, t.segments[0]), false);
+  // Lisbon has no booked stay, and it is a real night in a real city.
+  assert.equal(phaseState(t, "stays"), "started");
+});
+ok("stays is done when every city you sleep in is booked", () => {
+  // The transit stop has no hotel and must not hold the phase open.
+  assert.equal(phaseState(redeyeTrip(), "stays"), "done");
+});
+ok("transport stays open while a move between cities is unbooked", () => {
+  const t = redeyeTrip();
+  assert.deepEqual(unplannedMoves(t).map((d) => d.iso), ["2026-10-14", "2026-10-19"]);
+  // A booked flight is not enough on its own.
+  assert.equal(phaseState(t, "flights"), "started");
+});
+ok("the day you land needs no ground leg of its own", () => {
+  const t = redeyeTrip();
+  // Oct 11 is a change of city, but the flight already makes that move.
+  assert.equal(unplannedMoves(t).some((d) => d.iso === "2026-10-11"), false);
+});
+ok("transport is done once the trains are booked too", () => {
+  const t = redeyeTrip();
+  t.travel = t.travel.map((x) => ({ ...x, booked: true }));
+  assert.deepEqual(unplannedMoves(t), []);
+  assert.equal(phaseState(t, "flights"), "done");
 });
 ok("collects everything still to book, in date order", () => {
   const t = trip();
