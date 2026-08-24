@@ -30,6 +30,36 @@ build was unconfigured, and went stale the day the project got a config — a
 failure nobody saw, because a hardcoded Linux browser path meant the suite had
 never run here at all.
 
+## Writing the doc back out
+
+`src/doc-emit.js` is the mirror of `doc-parse.js`: it renders the trip in the
+planning doc's own format, and `views/Output.jsx` (`#/out/<id>`, the
+**itinerary** link in the header) shows it with a copy button. The format is
+copied from the real doc — `DAY 1 - SAT OCTOBER 10`, asterisk bullets, hotels
+indented three spaces beneath — including the abbreviations `TUES` and `THUR`,
+which are hers and not the standard ones.
+
+**The document is longer than the trip.** `trip.dates` is when you are *there*;
+the doc counts DAY 1 from when you *leave*, and an overnight flight departs the
+day before. `docDays()` spans the earliest thing that happens to the latest and
+fills every date in between. Emit `tripDays` instead and the outbound flight has
+no day to sit on and silently vanishes.
+
+**Ask where you sleep, not where you spend the day.** `cityForDay` answers the
+second, and using it made the flight home read `Arrive in Naples at 2:39pm` —
+you spent that morning in Naples, but the plane lands in Atlanta. `dayStay().sleep`
+is empty on a departure day, which is exactly the signal to fall back to the
+airport code and to print no city line at all.
+
+**`blockDays` counts the bare-city days.** Every day inside a segment gets an
+automatic `* Florence` line, so "days with no bullets" is always zero. An
+unplanned day is one whose *only* content is that derived line.
+
+**A stay has an `address`.** Added for this — the doc gives one for every hotel,
+and a doc you cannot write back in full is half a loop. Additive, so old trips
+still open; `doc-parse.js` reads `Address:` and `Booking confirmation No.:`
+lines and hangs them on the hotel above them.
+
 ## The doc behind a trip
 
 A trip can be a structured view of a Google Doc somebody else actually writes

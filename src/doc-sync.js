@@ -163,6 +163,7 @@ export function applyDoc(trip, parsed, { mode = "doc-wins", now = new Date().toI
       if (ps.ref) put(stay, `${p}.ref`, "ref", ps.ref);
       if (ps.total) put(stay, `${p}.total`, "total", ps.total);
       if (ps.notes) put(stay, `${p}.notes`, "notes", ps.notes);
+      if (ps.address) put(stay, `${p}.address`, "address", ps.address);
     }
     next.stays = stays;
   }

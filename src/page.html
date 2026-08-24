@@ -833,6 +833,64 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   .tripname-btn { max-width: 70vw; }
 }
 
+
+/* ------------------------------------------------------------ doc output */
+/* The itinerary as the planning doc renders it. This is the one place in the
+   app that deliberately does not look like the app: it is a preview of what
+   lands in her document, so it borrows a word processor's manners — a page on
+   a desk, a serif face, real indents — and none of the instrument styling the
+   rest of the desk uses. If it looked like Trip Desk it would not be doing
+   its job. */
+.sheet-doc {
+  background: var(--card); border: 1px solid var(--line); border-radius: 2px;
+  box-shadow: var(--shadow);
+  padding: 44px 52px 56px;
+  /* `width` is not optional here. The parent is a flex column, and an auto
+     cross-axis margin cancels the default stretch — the page would size to its
+     longest line (411px of "DAY 1 - SAT OCTOBER 10") instead of to 760. */
+  width: 100%; max-width: 760px; margin: 0 auto;
+  font-family: Georgia, "Times New Roman", Cambria, serif;
+  font-size: 15px; line-height: 1.55; color: var(--ink);
+}
+.sd-title {
+  font-family: inherit; font-size: 20px; font-weight: 700;
+  margin: 0; letter-spacing: -.01em;
+}
+.sd-range { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+/* Uppercase, bold, and given room above — the doc's own day rule. */
+.sd-day {
+  font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: .02em;
+  margin: 26px 0 7px;
+}
+.sd-title + .sd-day, .sd-range + .sd-day { margin-top: 22px; }
+
+/* Bullets, drawn rather than listed, so the indent is exactly the doc's. */
+.sd-b { margin: 0 0 3px; padding-left: 20px; position: relative; }
+.sd-b::before {
+  content: "\2022"; position: absolute; left: 6px; top: 0;
+  color: var(--muted);
+}
+.sd-b.sub { padding-left: 44px; }
+.sd-b.sub::before { left: 30px; content: "\25E6"; }
+.sd-b a { color: var(--accent-ink); }
+
+@media (max-width: 768px) {
+  .sheet-doc { padding: 22px 20px 28px; font-size: 16px; border-radius: 12px; }
+  .sd-b { padding-left: 18px; }
+  .sd-b::before { left: 4px; }
+  .sd-b.sub { padding-left: 34px; }
+  .sd-b.sub::before { left: 20px; }
+}
+
+@media print {
+  .head, .toolbar, .foot, .srcbar, .banner { display: none !important; }
+  body { background: #fff; padding: 0; }
+  .sheet-doc { border: 0; box-shadow: none; max-width: none; padding: 0; }
+  .sd-day { break-after: avoid; }
+  .sd-b { break-inside: avoid; }
+}
+
 /* ------------------------------------------------------------ doc source */
 /* The strip that says whose doc these plans came from. Quiet when the two
    agree; it earns attention only when they have drifted apart. */

@@ -62,9 +62,12 @@ export const blankTravel = (kind = "train") => ({
   carrier: "", ref: "", cost: "", currency: "USD", url: "", notes: "", booked: false,
 });
 
+/* `address` earns its place because the planning doc has one for every hotel,
+   and a doc we cannot write back in full is only half a loop. Additive:
+   hydrateTrip spreads over blankStay, so trips saved before this still open. */
 export const blankStay = (segmentId = "") => ({
   id: uid("stay"), segmentId, name: "", url: "", total: "", currency: "USD",
-  status: "Maybe", ref: "", notes: "", nightsOverride: null,
+  status: "Maybe", ref: "", notes: "", address: "", nightsOverride: null,
 });
 
 export const blankItem = (kind = "idea") => ({

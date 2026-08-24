@@ -120,9 +120,14 @@ export default function Stays({ trip, update, readOnly }) {
 
             {open && list.some((s) => s.id === open) && (
               <div className="row-wrap mt8">
-                <Field label="Link" w="1 1 320px">
+                <Field label="Link" w="1 1 260px">
                   <input value={(list.find((s) => s.id === open) || {}).url || ""} disabled={readOnly} placeholder="https://…"
                     onChange={(e) => setStays((all) => all.map((x) => (x.id === open ? { ...x, url: e.target.value } : x)))} />
+                </Field>
+                <Field label="Address" w="1 1 260px">
+                  <input value={(list.find((s) => s.id === open) || {}).address || ""} disabled={readOnly}
+                    placeholder="Via Capo D'Africa, 47, Roma"
+                    onChange={(e) => setStays((all) => all.map((x) => (x.id === open ? { ...x, address: e.target.value } : x)))} />
                 </Field>
               </div>
             )}

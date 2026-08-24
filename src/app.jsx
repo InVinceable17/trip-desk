@@ -18,6 +18,7 @@ import Cities from "./views/Cities.jsx";
 import Stays from "./views/Stays.jsx";
 import Days from "./views/Days.jsx";
 import Backup from "./views/Backup.jsx";
+import Output from "./views/Output.jsx";
 import SignIn from "./views/SignIn.jsx";
 import { SourceBar } from "./views/Source.jsx";
 
@@ -27,6 +28,8 @@ const VIEWS = { dates: Dates, flights: Flights, cities: Cities, stays: Stays, da
 
 function parseHash() {
   if (/^#\/backup/.test(location.hash || "")) return { view: "backup" };
+  const o = /^#\/out\/([^/]+)/.exec(location.hash || "");
+  if (o) return { view: "output", id: o[1] };
   const m = /^#\/t\/([^/]+)(?:\/([^/]+))?/.exec(location.hash || "");
   if (!m) return { view: "trips" };
   return { view: "trip", id: m[1], phase: PHASE_KEYS.includes(m[2]) ? m[2] : "dates" };
@@ -176,7 +179,7 @@ function App() {
   if (!db) return <div className="boot"><Spinner /> Opening your trips…</div>;
 
   const readOnly = mode === MODE.READONLY;
-  const trip = route.view === "trip" ? db.trips[route.id] : null;
+  const trip = route.view === "trip" || route.view === "output" ? db.trips[route.id] : null;
   const who = (user && (user.displayName || user.email)) || "";
 
   return (
@@ -204,6 +207,10 @@ function App() {
 
       {route.view === "backup" && (
         <Backup db={db} readOnly={readOnly} onRestore={restoreAll} />
+      )}
+
+      {route.view === "output" && trip && (
+        <Output trip={trip} onBack={() => go(`#/t/${trip.id}/days`)} />
       )}
 
       {route.view === "trips" && (
@@ -313,6 +320,7 @@ function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, readOn
                 ) : <span className="muted">no costs yet</span>}
                 <span className="caret" aria-hidden="true">{costOpen ? "▴" : "▾"}</span>
               </button>
+              <button className="link" onClick={() => go(`#/out/${trip.id}`)}>itinerary</button>
               <button className="link" onClick={() => go("#/backup")}>backups</button>
             </div>
           </>

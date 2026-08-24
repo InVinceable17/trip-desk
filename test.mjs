@@ -199,7 +199,7 @@ import {
   blankTrip, hydrateTrip, migrateV1, tripDays, tripNights, ptoNote,
   segmentSpans, cityForDay, moveBoundary, resizeLast, assignedNights,
   cityFlags, tripCost, phaseState, openBookings, indexEntry, blankSegment,
-  blankStay, blankItem, isTransitStop, unplannedMoves,
+  blankStay, blankItem, isTransitStop, unplannedMoves, nightsBetween,
 } from "./src/model.js";
 
 /* The exact shape the live v1 artifact stores. */
@@ -1123,6 +1123,161 @@ ok("only a confirmed, never-initialised workspace seeds", () => {
 });
 ok("a missing argument never lands on seed by accident", () => {
   assert.equal(readVerdict({ fromCache: true }), "unknown");
+});
+
+/* ----------------------------------------------------------- doc emitter */
+/* doc-emit.js has one job: produce something the planning doc would recognise
+   as its own. So the tests are about the format, literally — the heading
+   shape, her non-standard weekday abbreviations, the indent under a hotel —
+   and about the round trip, which is the only real proof that emitting and
+   parsing agree with each other. */
+
+import { blocks as emitBlocks, text as emitText, docDays, blankDays, pieces } from "./src/doc-emit.js";
+
+console.log("\ndoc emitter");
+
+/* The trip the real planning doc describes, as the app would hold it. */
+const docTrip = () => {
+  const t = blankTrip("Italy");
+  t.dates = { start: "2026-10-11", end: "2026-10-23", locked: true };
+  t.travelers = 2;
+  t.segments = [
+    { id: "s1", city: "Rome", nights: 3, locked: true },
+    { id: "s2", city: "Florence", nights: 5, locked: true },
+    { id: "s3", city: "Naples", nights: 4, locked: true },
+  ];
+  t.flights.options = [{
+    id: "o1", status: "Booked", priceEach: "1402",
+    out: { date: "2026-10-10", from: "ATL", to: "FCO", depart: "16:35", arrive: "07:35", plusOne: true },
+    ret: { date: "2026-10-23", from: "NAP", to: "ATL", depart: "09:05", arrive: "14:39", plusOne: false },
+  }];
+  t.flights.bookedId = "o1";
+  t.stays = [{
+    ...blankStay("s1"), name: "Hotel Lancelot", url: "https://www.lancelothotel.com/",
+    address: "Via Capo D'Africa, 47, Roma", ref: "2026082251320670", status: "Booked",
+  }];
+  return t;
+};
+
+ok("the document runs from the departure, not from trip.dates", () => {
+  const t = docTrip();
+  const d = docDays(t);
+  // trip.dates starts on the 11th; the flight leaves on the 10th.
+  assert.equal(d[0], "2026-10-10");
+  assert.equal(d[d.length - 1], "2026-10-23");
+  assert.equal(d.length, 14);
+});
+ok("and the days it covers are contiguous, with no hole where a date was skipped", () => {
+  const d = docDays(docTrip());
+  d.forEach((iso, i) => { if (i) assert.equal(nightsBetween(d[i - 1], iso), 1); });
+});
+ok("the title reports the document span, so it cannot disagree with DAY 1", () => {
+  const b = emitBlocks(docTrip());
+  assert.equal(b[0].text, "Italy, October 2026");
+  assert.equal(b[1].text, "(Saturday October 10 through Friday October 23)");
+});
+ok("day headings use her abbreviations, not the standard ones", () => {
+  const heads = emitBlocks(docTrip()).filter((x) => x.kind === "day").map((x) => x.text);
+  assert.equal(heads[0], "DAY 1 - SAT OCTOBER 10");
+  assert.equal(heads[1], "DAY 2 - SUN OCTOBER 11");
+  // TUES and THUR, not TUE and THU.
+  assert.ok(heads.some((h) => h.includes("TUES OCTOBER 13")), heads.join(" | "));
+  assert.ok(heads.some((h) => h.includes("THUR OCTOBER 15")), heads.join(" | "));
+});
+ok("an overnight flight departs on one day and arrives on the next", () => {
+  const out = emitText(docTrip());
+  const lines = out.split(String.fromCharCode(10));
+  const dep = lines.findIndex((l) => l.includes("Depart ATL"));
+  const arr = lines.findIndex((l) => l.includes("Arrive in"));
+  assert.ok(dep > -1 && arr > dep, out);
+  assert.ok(lines[dep].includes("4:35pm"), lines[dep]);
+  // It lands in the city you sleep in, not the airport code.
+  assert.ok(lines[arr].includes("Rome") && lines[arr].includes("7:35am"), lines[arr]);
+});
+ok("times are the doc's 12-hour, never 24", () => {
+  const out = emitText(docTrip());
+  assert.ok(!/\b1[3-9]:\d\d\b/.test(out), out);
+  assert.ok(out.includes("9:05am"));
+});
+ok("the hotel is a nested block on the day you check in", () => {
+  const lines = emitText(docTrip()).split(String.fromCharCode(10));
+  const h = lines.find((l) => l.includes("Hotel:"));
+  const a = lines.find((l) => l.includes("Address:"));
+  const c = lines.find((l) => l.includes("Booking confirmation"));
+  assert.equal(h, "   * Hotel: [Hotel Lancelot](https://www.lancelothotel.com/)");
+  assert.equal(a, "   * Address: Via Capo D'Africa, 47, Roma");
+  assert.equal(c, "   * Booking confirmation No.: 2026082251320670 (3 nights, October 11-14)");
+});
+ok("a day trip reads as the base city and the trip out of it", () => {
+  const t = docTrip();
+  t.days = { "2026-10-16": { notes: "", items: [], city: "Bologna", locked: false } };
+  const out = emitText(t);
+  assert.ok(out.includes("* Florence - Day trip to Bologna"), out);
+});
+ok("a short note becomes the day's theme; a long one keeps its own line", () => {
+  const t = docTrip();
+  t.days = {
+    "2026-10-12": { notes: "Ancient Rome", items: [], city: "", locked: false },
+    "2026-10-13": { notes: "A much longer note that is really a paragraph and not a theme at all", items: [], city: "", locked: false },
+  };
+  const out = emitText(t);
+  assert.ok(out.includes("* Rome - Ancient Rome"), out);
+  assert.ok(out.includes("* Rome" + String.fromCharCode(10)), "long-note day should keep a bare city line");
+  assert.ok(out.includes("* A much longer note"), out);
+});
+ok("spacing is the doc's: one blank before DAY 1, two between days", () => {
+  const out = emitText(docTrip());
+  const lines = out.split(String.fromCharCode(10));
+  const first = lines.indexOf("DAY 1 - SAT OCTOBER 10");
+  assert.equal(lines[first - 1], "");
+  assert.notEqual(lines[first - 2], "");
+  const second = lines.indexOf("DAY 2 - SUN OCTOBER 11");
+  assert.equal(lines[second - 1], "");
+  assert.equal(lines[second - 2], "");
+});
+ok("an empty day is still a numbered heading - a missing day would read as a mistake", () => {
+  const t = docTrip();
+  const heads = emitBlocks(t).filter((x) => x.kind === "day");
+  assert.equal(heads.length, 14);
+  assert.ok(blankDays(t).length > 0);
+});
+ok("blankDays names the days nobody has planned", () => {
+  const t = docTrip();
+  const before = blankDays(t).length;
+  t.days = { "2026-10-21": { notes: "Beach club?", items: [], city: "", locked: false } };
+  assert.equal(blankDays(t).length, before - 1);
+});
+ok("markdown links are split out for rendering, text left intact", () => {
+  const out = pieces("Hotel: [Hotel Lancelot](https://x.test/a) today");
+  assert.deepEqual(out.map((x) => x.text), ["Hotel: ", "Hotel Lancelot", " today"]);
+  assert.equal(out[1].url, "https://x.test/a");
+  assert.deepEqual(pieces("no links here").map((x) => x.text), ["no links here"]);
+});
+
+/* The round trip. Emitting and parsing are two halves of the same claim about
+   the format; if they disagree, one of them is wrong about her document. */
+ok("what it writes, the parser reads back", () => {
+  const t = docTrip();
+  t.days = { "2026-10-12": { notes: "Ancient Rome", items: [], city: "", locked: false } };
+  const parsed = parseDocText(emitText(t));
+
+  assert.equal(parsed.name, "Italy, October 2026");
+  assert.deepEqual(parsed.dates, { start: "2026-10-10", end: "2026-10-23" });
+  const hotel = parsed.stays.find((x) => /Lancelot/.test(x.name));
+  assert.ok(hotel, JSON.stringify(parsed.stays));
+  assert.equal(hotel.url, "https://www.lancelothotel.com/");
+  assert.equal(hotel.address, "Via Capo D'Africa, 47, Roma");
+  assert.equal(hotel.ref, "2026082251320670");
+  assert.ok(Object.keys(parsed.days).length > 0, "expected day headings to survive");
+});
+ok("and it reads back the hotel address it just wrote", () => {
+  const parsed = parseDocText([
+    "Italy, October 2026",
+    "* Hotel: [Hotel Odeon](https://www.odeonhotelnapoli.it/)",
+    "   * Address: Via Silvio Spaventa, 29, - 80142 Napoli",
+  ].join(String.fromCharCode(10)));
+  assert.equal(parsed.stays.length, 1);
+  assert.equal(parsed.stays[0].address, "Via Silvio Spaventa, 29, - 80142 Napoli");
 });
 
 console.log(`\n${pass} checks passed\n`);

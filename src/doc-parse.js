@@ -105,6 +105,13 @@ const NIGHTS_IN = /^(\d{1,2})\s*(?:nights?|nts?)\s+in\s+(.+?)\s*$/i;
 
 /* "Hotel: Artemide", "Stay: ...", "Hotel Artemide — $1,200, conf ABC123" */
 const HOTEL_LABEL = /^(?:hotel|stay|staying at|accommodation|lodging|airbnb)\s*[:–—-]\s*(.+)$/i;
+/* Both sit under the hotel they belong to, so they attach to the last one
+   seen. Without this the confirmation number a doc states on its own line is
+   read as an unparsed stray, and the stay comes back with no booking on it. */
+const ADDRESS_LABEL = /^address\s*[:–—-]\s*(.+)$/i;
+const CONFIRM_LABEL = /^(?:booking\s+)?(?:confirmation|conf|booking)\s*(?:no\.?|number|code|#)?\s*[:–—-]\s*(.+)$/i;
+/* Refs run to slashes as well as dashes: "2215/2026" is one in the wild. */
+const REF_TOKEN = /^([A-Za-z0-9][A-Za-z0-9/-]{3,})/;
 const REF_RE = /\b(?:conf(?:irmation)?|ref(?:erence)?|booking)\s*(?:#|no\.?|number|code)?\s*[:.]?\s*([A-Z0-9][A-Z0-9-]{4,})\b/i;
 
 /* "Day 3 — Oct 14 — Florence", "Oct 14 (Wed)", "Wednesday, October 14" */
@@ -201,6 +208,21 @@ export function parseDocText(text, { anchor = "", docUrl = "", docTitle = "" } =
       }
     }
 
+    const addr = body.match(ADDRESS_LABEL);
+    if (addr && out.stays.length) {
+      out.stays[out.stays.length - 1].address = trimSeps(addr[1]);
+      continue;
+    }
+
+    const conf = body.match(CONFIRM_LABEL);
+    if (conf && out.stays.length) {
+      const tok = trimSeps(conf[1]).match(REF_TOKEN);
+      if (tok) {
+        out.stays[out.stays.length - 1].ref = tok[1];
+        continue;
+      }
+    }
+
     /* A day heading: a bare date, optionally "Day 3 —" prefixed and optionally
        naming the city it is spent in. */
     const headBody = clean((body.match(DAY_HEAD) || [])[1] || body);
@@ -269,6 +291,7 @@ export function parseDocJson(text, { docUrl = "", docTitle = "" } = {}) {
   const stays = (data.stays || data.hotels || []).map((s) => ({
     name: clean(s.name), url: clean(s.url), ref: clean(s.ref || s.confirmation),
     total: String(s.total || "").replace(/[^\d.]/g, ""), city: clean(s.city), notes: clean(s.notes),
+    address: clean(s.address),
   })).filter((s) => s.name);
 
   const days = {};
@@ -322,7 +345,7 @@ export function importPrompt(trip) {
   "dates": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" },
   "travelers": 2,
   "segments": [ { "city": "Rome", "nights": 4 } ],
-  "stays":    [ { "name": "Hotel Artemide", "city": "Rome", "url": "", "ref": "", "total": "", "notes": "" } ],
+  "stays":    [ { "name": "Hotel Artemide", "city": "Rome", "url": "", "ref": "", "total": "", "address": "", "notes": "" } ],
   "days": { "YYYY-MM-DD": { "city": "", "notes": "", "items": [ { "title": "", "time": "", "cost": "", "url": "", "kind": "idea" } ] } }
 }
 
