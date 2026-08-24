@@ -3,7 +3,7 @@ import { range, label as dayLabel, to12h, showDur, parseDur } from "../flights.j
 import {
   tripDays, tripNights, segmentSpans, segColor, leadStay, cityForDay,
   travelLegs, dayTrips, travelDays, dayStay, travelOn, KIND_GLYPH, fmtMoney,
-  blankDay, openBookings, nightsBetween,
+  blankDay, openBookings, nightsBetween, isTransitStop,
 } from "../model.js";
 import Timeline from "./Timeline.jsx";
 
@@ -128,7 +128,11 @@ export default function TripTimeline({ trip, phase, update, readOnly }) {
     layers.push({
       key: "cities", kind: "segments", label: "Cities", active: phase === "cities",
       origin,
-      segments: segs.map((s, i) => ({ ...s, color: segColor(i) })),
+      /* `transit` still occupies its nights — the lane is laid out cumulatively
+         and skipping them would slide every city a day left — but it draws no
+         bar. A night in the air is not a city, and the Travel row above is
+         already saying where you are. */
+      segments: segs.map((s, i) => ({ ...s, color: segColor(i), transit: isTransitStop(trip, s) })),
       trips: dayTrips(trip).map((d) => ({ ...d, idx: idx(d.iso) })),
       moves: travelDays(trip).map((d) => ({ ...d, idx: idx(d.iso) })),
       onPick: (id) => pick("city", id),

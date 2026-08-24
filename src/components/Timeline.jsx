@@ -161,6 +161,8 @@ function SegmentLayer({ days, segments, origin, onChange, readOnly, colW, trips,
       style={{ display: "contents" }}>
       {spans.map(({ s, i, start, nights }) => {
         if (!nights) return null;
+        // Occupies the nights, draws nothing: there is no city to name.
+        if (s.transit) return null;
         // Arrive during the day, leave during the day. The bar therefore runs
         // midday-to-midday and meets its neighbour exactly on the travel day.
         const from = Math.max(0, Math.min(start, days.length));

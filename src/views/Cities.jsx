@@ -29,6 +29,9 @@ export default function Cities({ trip, update, readOnly }) {
   const booked = bookedFlight(trip);
   /* The night you are in the air, if nothing has claimed it yet. */
   const gap = transitGap(trip);
+  /* Counts are about places you are going, so a night under way is not one. */
+  const cities = (trip.segments || []).filter((s) => !isTransitStop(trip, s));
+  const cityCount = cities.length;
 
   const setSegments = (next) =>
     update((t) => ({ ...t, segments: typeof next === "function" ? next(t.segments) : next }));
@@ -170,8 +173,8 @@ export default function Cities({ trip, update, readOnly }) {
         right={
           <span className={`nightcount${got === total && total ? " ok" : ""}`}>
             <b>{got}</b> of <b>{total}</b> nights
-            {trip.segments.length > 0 && (
-              <> · <b>{trip.segments.filter((s) => s.locked).length}</b> of <b>{trip.segments.length}</b> locked</>
+            {cityCount > 0 && (
+              <> · <b>{cities.filter((s) => s.locked).length}</b> of <b>{cityCount}</b> locked</>
             )}
           </span>
         }
@@ -196,7 +199,7 @@ export default function Cities({ trip, update, readOnly }) {
           </div>
         )}
 
-        {!trip.segments.length && !gap && (
+        {!cityCount && !gap && (
           <div className="empty">
             {days.length ? "Add your first city." : "Lock trip dates first."}
           </div>
@@ -204,8 +207,28 @@ export default function Cities({ trip, update, readOnly }) {
 
         <div className="seglist">
           {cityPlan(trip).map((row) => (
-            row.type === "trip"
+            row.type === "transit"
               ? (
+                /* Deliberately not a stop row: no swatch, no city field, no
+                   nights control, nothing to reorder. It is a note between two
+                   cities saying the night in between is spoken for. */
+                <div key={row.seg.id} className="segrow transitrow">
+                  <span className="drag placeholder" aria-hidden="true">✈</span>
+                  <span className="transitwhat">
+                    Night in the air
+                    {row.seg.city.trim() && <span className="muted"> · {row.seg.city.trim()}</span>}
+                  </span>
+                  <span className="segdates">
+                    <span className="dpair">{dayLabel(row.span.startDate)} → {dayLabel(row.span.endDate)}</span>
+                  </span>
+                  <div className="grow" />
+                  <Btn className="sm" kind="danger" disabled={readOnly}
+                    onClick={() => setSegments((segs) => segs.filter((x) => x.id !== row.seg.id))}
+                    aria-label="Remove the night in the air">×</Btn>
+                </div>
+              )
+              : row.type === "trip"
+                ? (
                 <div key={`t${row.iso}`} className="segrow triprow">
                   <span className="drag placeholder" aria-hidden="true">↳</span>
                   <span className="swatch-lg ring" style={{ borderColor: row.color }} aria-hidden="true" />
@@ -218,8 +241,8 @@ export default function Cities({ trip, update, readOnly }) {
                     onClick={() => update((t) => setDayTrip(t, row.iso, ""))}
                     aria-label={`Remove the day trip to ${row.city}`}>×</Btn>
                 </div>
-              )
-              : renderBase(row)
+                )
+                : renderBase(row)
           ))}
 
           {/* Add sits at the end of the list, where the next city goes. */}

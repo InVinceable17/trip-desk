@@ -439,34 +439,57 @@ const rowText = (city) => p3.evaluate((c) => {
   return r ? r.querySelector(".segdates").textContent.replace(/\s+/g, " ").trim() : null;
 }, city);
 
-const air = await p3.evaluate(() => {
-  const r = [...document.querySelectorAll(".segrow")].find((x) => x.querySelector(".segcity.transit"));
-  return r ? r.querySelector(".segdates").textContent.replace(/\s+/g, " ").trim() : null;
+/* It is not a stop that happens to be labelled differently — it is not a stop.
+   No city field, no swatch, no nights control, no lock, nothing to reorder. */
+const airRow = await p3.evaluate(() => {
+  const r = document.querySelector(".segrow.transitrow");
+  if (!r) return null;
+  return {
+    text: r.textContent.replace(/\s+/g, " ").trim(),
+    hasCityInput: !!r.querySelector("input.segcity"),
+    hasSwatch: !!r.querySelector(".swatch-lg"),
+    hasNights: !!r.querySelector(".segnights"),
+    hasDrag: !!r.querySelector("button.drag"),
+    buttons: [...r.querySelectorAll("button")].map((b) => b.textContent.trim().toLowerCase()),
+  };
 });
-check("the transit stop says it is in the air, not that you arrived",
-  !!air && /In the air/.test(air) && !/Arrive/.test(air), air);
-check("and it still shows both ends of the night", !!air && /Oct 10/.test(air) && /Oct 11/.test(air), air);
+check("the night in the air is listed, and says what it is",
+  !!airRow && /night in the air/i.test(airRow.text), airRow);
+check("it shows both ends of the night",
+  !!airRow && /Oct 10/.test(airRow.text) && /Oct 11/.test(airRow.text), airRow);
+check("it is not a city row: no name field, no swatch, no nights, no reorder",
+  !!airRow && !airRow.hasCityInput && !airRow.hasSwatch && !airRow.hasNights && !airRow.hasDrag, airRow);
+check("and it offers no day trip and no lock",
+  !!airRow && !airRow.buttons.some((b) => /day trip|lock/.test(b)), airRow);
+check("it never says you arrived anywhere",
+  !!airRow && !/arrive/i.test(airRow.text), airRow);
 
-const rome = await rowText("Rome");
-check("the city after it reads as a normal arrival, on the day the calendar says",
-  !!rome && /Arrive/.test(rome) && /Oct 11/.test(rome), rome);
-
-check("it is not presented as a city at all", await p3.evaluate(() => {
-  const r = [...document.querySelectorAll(".segrow")].find((x) => x.querySelector(".segcity.transit"));
-  return !!r && !r.querySelector("input.segcity") && /In the air/.test(r.textContent);
+/* The Gantt files it the same way: the Cities lane draws nothing for it. */
+check("the cities lane of the calendar draws no bar for it", await p3.evaluate(() => {
+  const row = [...document.querySelectorAll(".ribbon .tl-row.seg-row")][0];
+  if (!row) return false;
+  const segs = [...row.querySelectorAll(".seg")];
+  return segs.length === 1 && /Rome/.test(segs[0].textContent);
 }));
+
+check("the city after it reads as a normal arrival, on the day the calendar says", await (async () => {
+  const rome = await rowText("Rome");
+  return !!rome && /Arrive/.test(rome) && /Oct 11/.test(rome);
+})(), await rowText("Rome"));
+
+check("the counter counts cities, not segments",
+  /1 of 1 locked/.test((await p3.textContent(".nightcount")).replace(/\s+/g, " ")),
+  await p3.textContent(".nightcount"));
+
 check("the offer is gone once the night is accounted for",
   (await p3.locator(".banner.offer").count()) === 0);
-check("no day trip is offered out of a plane", await p3.evaluate(() => {
-  const r = [...document.querySelectorAll(".segrow")].find((x) => /In the air/.test(x.textContent));
-  const btn = r && [...r.querySelectorAll("button")].find((x) => /day trip/i.test(x.textContent));
-  return !!btn && btn.disabled;
-}));
-check("but the real city still offers one", await p3.evaluate(() => {
-  const r = [...document.querySelectorAll(".segrow")].find((x) => /Arrive/.test(x.textContent));
+
+check("but a real city still offers a day trip", await p3.evaluate(() => {
+  const r = [...document.querySelectorAll(".segrow")].find((x) => x.querySelector("input.segcity"));
   const btn = r && [...r.querySelectorAll("button")].find((x) => /day trip/i.test(x.textContent));
   return !!btn && !btn.disabled;
 }));
+
 /* And the same trip with the night unaccounted for offers to add it. */
 const GAPPED = REDEYE.replace(
   '{"id":"sa","city":"","nights":1,"locked":true,"kind":"transit"},',
@@ -490,9 +513,10 @@ check("an unaccounted night in the air is offered, not silently absorbed",
 const segsBefore = await p4.locator(".segrow").count();
 await p4.click(".banner.offer button:has-text('Add the night')");
 await p4.waitForTimeout(500);
-check("accepting it adds one row, typed as transit",
+check("accepting it adds the night, as a night and not as a city",
   (await p4.locator(".segrow").count()) === segsBefore + 1
-  && (await p4.locator(".segcity.transit").count()) === 1);
+  && (await p4.locator(".segrow.transitrow").count()) === 1
+  && (await p4.locator(".segrow.transitrow input.segcity").count()) === 0);
 check("and the offer withdraws", (await p4.locator(".banner.offer").count()) === 0);
 server4.close();
 server3.close();

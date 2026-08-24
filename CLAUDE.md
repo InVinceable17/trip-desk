@@ -111,8 +111,17 @@ arithmetic work, and it is right. What was wrong is that segments were
 spend flying was to invent a place ("Overnight to Rome") and then infer
 backwards that it was not one. Segments now carry `kind: "city" | "transit"`,
 and `transitGap()` offers the night when a booked leg lands the day after it
-departs, so nobody has to hand-craft a stub. Anywhere a segment is described
-to a person, check `isTransitStop` first.
+departs, so nobody has to hand-craft a stub.
+
+Typing it was not enough on its own: a transit stop that still rendered as a
+row in the Cities list and a bar in the Cities lane is still being *filed* as a
+city, whatever its label says. So `cityPlan()` returns `type: "transit"` and
+the list draws a rule with a note on it — no swatch, no name field, no nights
+control, nothing to reorder — while `SegmentLayer` returns `null` for it and
+the lane simply has a gap. It keeps its nights either way, because the lane is
+laid out cumulatively and skipping them would slide every city a day left.
+Counts of "cities" filter it out; counts of *nights* must not, since that is
+the check that every night is accounted for.
 
 **`blankSegment` must not default `kind`.** `hydrateTrip` spreads it over every
 stored segment, so a default there is not a default — it is a rewrite of every

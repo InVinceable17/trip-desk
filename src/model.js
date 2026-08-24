@@ -447,7 +447,13 @@ export function cityPlan(t) {
   const trips = dayTrips(t);
   const rows = [];
   spans.forEach((sp) => {
-    rows.push({ type: "base", seg: sp.seg, i: sp.i, span: sp, color: sp.color });
+    /* A night under way is not a stop on the list of places you are going. It
+       still owns its night — the calendar needs that — but it is typed apart
+       here so no view has to decide again what it is looking at. */
+    rows.push({
+      type: isTransitStop(t, sp.seg) ? "transit" : "base",
+      seg: sp.seg, i: sp.i, span: sp, color: sp.color,
+    });
     trips
       .filter((d) => d.segmentId === sp.seg.id)
       .forEach((d) => rows.push({ type: "trip", iso: d.iso, city: d.city, base: d.base, color: sp.color, seg: sp.seg }));
