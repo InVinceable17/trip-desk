@@ -387,6 +387,79 @@ await p2.click(".step:has-text('Cities')");
 await p2.waitForTimeout(400);
 check("reboot restores the dragged nights", (await p2.evaluate(() => [...document.querySelectorAll(".segnights .num")].map((x) => x.textContent))).join(",") === after.map((n) => n + "n").join(","));
 
+console.log("\na night in the air is not an arrival");
+/* Served rather than clicked into place, because the scenario has to be exact:
+   the trip must start on the outbound date, and the first stop must own the
+   single night the plane is in the air. Driving the UI into that state was
+   fragile enough to skip itself silently, which is worse than not testing it.
+
+   The bug this pins: the row said "Arrive Oct 10" of a night nobody arrives
+   anywhere on, and a stop named for its destination then read as that city
+   starting a day before the calendar above said it did. */
+const REDEYE = JSON.stringify({
+  schema: 2, id: "trip_red", name: "Italy", createdAt: "2026-08-01T00:00:00Z",
+  updatedAt: "2026-08-01T00:00:00Z", travelers: 2,
+  window: { start: "2026-10-10", end: "2026-10-25" },
+  target: { minNights: 3, maxNights: 21 },
+  dates: { start: "2026-10-10", end: "2026-10-14", locked: true },
+  holidays: [], homeAirports: "ATL", destAirports: "FCO",
+  flights: {
+    options: [{
+      id: "o1", name: "Delta", status: "Booked", priceEach: "1402", fares: [], checks: [],
+      out: { date: "2026-10-10", from: "ATL", to: "FCO", depart: "16:35", arrive: "07:35", plusOne: true, stops: "nonstop", carrier: "Delta", flight: "DL 214", dur: "9h" },
+      ret: { date: "2026-10-14", from: "FCO", to: "ATL", depart: "09:05", arrive: "14:39", plusOne: false, stops: "nonstop", carrier: "Delta", flight: "DL 279", dur: "11h" },
+    }],
+    bookedId: "o1", booking: { ref: "ABC123", paidTotal: "2804", currency: "USD", url: "", notes: "" },
+  },
+  travel: [], baseCurrency: "USD", rates: {},
+  segments: [
+    { id: "sa", city: "Overnight to Rome", nights: 1, locked: true },
+    { id: "sb", city: "Rome", nights: 3, locked: true },
+  ],
+  stays: [], days: {},
+  source: { kind: "", docUrl: "", docTitle: "", syncedAt: "", syncedBy: "", text: "", fields: {} },
+});
+const server3 = await serve(8812, {
+  "data/index.json": JSON.stringify({ schema: 2, order: ["trip_red"], trips: [{ id: "trip_red", name: "Italy" }], prefs: {} }),
+  "data/trips/trip_red.json": REDEYE,
+});
+const p3 = await b.newPage({ viewport: { width: 1280, height: 1100 } });
+p3.on("pageerror", (e) => errs.push("redeye pageerror: " + e.message));
+await p3.addInitScript(() => { window.__pub = []; window.claude = { use: async () => null }; });
+await p3.goto("http://localhost:8812/", { waitUntil: "load" });
+await p3.waitForTimeout(900);
+await p3.click(".tripmain");
+await p3.waitForTimeout(400);
+await p3.click(".step:has-text('Cities')");
+await p3.waitForTimeout(400);
+
+const rowText = (city) => p3.evaluate((c) => {
+  const r = [...document.querySelectorAll(".segrow")]
+    .find((x) => (x.querySelector(".segcity") || {}).value === c);
+  return r ? r.querySelector(".segdates").textContent.replace(/\s+/g, " ").trim() : null;
+}, city);
+
+const air = await rowText("Overnight to Rome");
+check("the transit stop says it is in the air, not that you arrived",
+  !!air && /In the air/.test(air) && !/Arrive/.test(air), air);
+check("and it still shows both ends of the night", !!air && /Oct 10/.test(air) && /Oct 11/.test(air), air);
+
+const rome = await rowText("Rome");
+check("the city after it reads as a normal arrival, on the day the calendar says",
+  !!rome && /Arrive/.test(rome) && /Oct 11/.test(rome), rome);
+
+check("no day trip is offered out of a plane", await p3.evaluate(() => {
+  const r = [...document.querySelectorAll(".segrow")].find((x) => /In the air/.test(x.textContent));
+  const btn = r && [...r.querySelectorAll("button")].find((x) => /day trip/i.test(x.textContent));
+  return !!btn && btn.disabled;
+}));
+check("but the real city still offers one", await p3.evaluate(() => {
+  const r = [...document.querySelectorAll(".segrow")].find((x) => /Arrive/.test(x.textContent));
+  const btn = r && [...r.querySelectorAll("button")].find((x) => /day trip/i.test(x.textContent));
+  return !!btn && !btn.disabled;
+}));
+server3.close();
+
 await p.screenshot({ path: "shot-days.png", fullPage: true });
 await p2.screenshot({ path: "shot-trips.png", fullPage: true });
 console.log(errs.length ? "\nERRORS:\n" + errs.join("\n") : "\nno console errors");

@@ -97,6 +97,22 @@ value alongside the trip's, so the two can disagree out loud — that is what th
 "n differ" badge counts, and what `driftList()` returns. A line the parser does
 not recognise goes into `unparsed` and is shown, never guessed at.
 
+**Segment dates are derived, and there is nothing to edit.** `segmentSpans`
+computes each stop's start from `trip.dates.start` plus the nights of every
+stop before it — no start date is stored. To move when a city begins you change
+the trip's start date or the nights of what precedes it. The ribbon and the
+Cities list both read that one function, so they cannot disagree about a date;
+if they *look* like they disagree, it is the wording.
+
+**A night in the air is a stop, but not an arrival.** The overnight flight owns
+a night, so it needs a segment to hold it — and `isTransitStop()` is how you
+tell that segment from a city. The Cities row used to say "Arrive Oct 10" of
+it, which is false on its own terms and worse when the stop is named for where
+it is going ("Overnight to Rome"), because the row then reads as Rome starting
+a day earlier than the calendar directly above it. Stays already knew about
+transit stops; Cities did not. Anywhere a segment is described to a person,
+check `isTransitStop` first.
+
 **A hotel renamed in the doc reads as a different hotel.** The doc has no ids,
 so a rename and a replacement are the same edit. Both survive; you delete the
 stale one. This is deliberate — see the comment above `key()` in `doc-sync.js`.

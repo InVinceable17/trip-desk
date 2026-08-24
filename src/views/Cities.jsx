@@ -3,7 +3,7 @@ import { label as dayLabel } from "../flights.js";
 import {
   tripDays, tripNights, assignedNights, segmentSpans, cityFlags,
   addSegment, moveSegment, segColor, bookedFlight,
-  cityPlan, setDayTrip,
+  cityPlan, setDayTrip, isTransitStop,
 } from "../model.js";
 import { Btn, Card } from "../components/ui.jsx";
 
@@ -70,6 +70,11 @@ export default function Cities({ trip, update, readOnly }) {
   /* A homebase stop: the row that owns nights and can be locked. */
   const renderBase = (row) => {
     const s = row.seg, i = row.i, span = row.span;
+    /* A night in the air is a stop that owns a night but is not a place you
+       arrive at. Saying "Arrive Oct 10" of it is not a small wording problem:
+       when the stop is called something like "Overnight to Rome", the row
+       reads as Rome starting a day earlier than the calendar above says. */
+    const transit = isTransitStop(trip, s);
     return (
       <div
         key={s.id}
@@ -106,17 +111,23 @@ export default function Cities({ trip, update, readOnly }) {
         </div>
 
         <span className="segdates">
-          {span ? (
-            <>
-              <span className="dpair"><i>Arrive</i> {dayLabel(span.startDate)}</span>
-              <span className="dpair"><i>Depart</i> {dayLabel(span.endDate)}</span>
-            </>
-          ) : <span className="muted">—</span>}
+          {!span ? <span className="muted">—</span>
+            : transit ? (
+              <span className="dpair">
+                <i>In the air</i> {dayLabel(span.startDate)} → {dayLabel(span.endDate)}
+              </span>
+            ) : (
+              <>
+                <span className="dpair"><i>Arrive</i> {dayLabel(span.startDate)}</span>
+                <span className="dpair"><i>Depart</i> {dayLabel(span.endDate)}</span>
+              </>
+            )}
         </span>
 
         <div className="grow" />
 
-        <Btn className="sm" disabled={readOnly || !span}
+        {/* There is no day trip out of a plane. */}
+        <Btn className="sm" disabled={readOnly || !span || transit}
           onClick={() => { setTripFor(s.id); setTripDate(daysFor(s.id)[0] || ""); setTripCity(""); setAdding(false); }}>
           + day trip
         </Btn>
