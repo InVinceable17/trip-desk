@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { label as dayLabel, dayOf, DOW } from "../flights.js";
+import { label as dayLabel } from "../flights.js";
 import {
   tripDays, cityForDay, blankItem, blankDay, ITEM_KINDS,
   segmentSpans, dayStay, travelOn, KIND_GLYPH, fmtMoney, leadStay, lockedDayCount,
@@ -21,6 +21,11 @@ import { Btn, Amount } from "../components/ui.jsx";
    Everything above the notes is derived and read-only here: which city you
    sleep in, which bed, what moves that day. Clicking any of it opens the
    panel that owns it, so the document doubles as navigation.
+
+   It should read as one continuous page of text, not a stack of rows. No
+   rules between days, no chips, no visible controls — the day heading, the
+   facts under it and the prose are all just lines. Anything you can operate
+   stays invisible until the pointer is on the day it belongs to.
    ========================================================================== */
 
 const KIND_LABEL = { idea: "idea", ticket: "ticket", reservation: "booking", tip: "tip" };
@@ -103,10 +108,7 @@ export default function Itinerary({ trip, update, readOnly, onGo }) {
             style={where ? { "--dayhue": where.color } : undefined}>
 
             <h3 className="docday-head">
-              <span className="docday-when">
-                <span className="docday-dow">{DOW[dayOf(iso)]}</span>
-                <span className="docday-date">{dayLabel(iso)}</span>
-              </span>
+              <span className="docday-date">{dayLabel(iso)}</span>
 
               {st.moves ? (
                 <button className="docday-where" onClick={() => onGo("cities")}>
@@ -135,8 +137,8 @@ export default function Itinerary({ trip, update, readOnly, onGo }) {
                 </span>
               ) : null}
 
-              {i === 0 && <span className="chip">arrive</span>}
-              {last && <span className="chip">depart</span>}
+              {i === 0 && <span className="docday-edge">arrive</span>}
+              {last && <span className="docday-edge">depart</span>}
 
               <span className="grow" />
 
@@ -160,17 +162,17 @@ export default function Itinerary({ trip, update, readOnly, onGo }) {
                 {bed && (
                   <button className="ctxbit" onClick={() => onGo("stays")}>
                     {bed.name || "unnamed place"}
-                    {bed.status !== "Booked" && <span className="est">{bed.status.toLowerCase()}</span>}
+                    {bed.status !== "Booked" && <i>{bed.status.toLowerCase()}</i>}
                   </button>
                 )}
                 {moving.map((L) => (
                   <button key={L.id} className={`ctxbit${L.booked ? " booked" : ""}`}
                     onClick={() => onGo("flights")}>
                     <span aria-hidden="true">{KIND_GLYPH[L.kind] || "→"}</span>
-                    {L.depart ? <span className="num">{L.depart}</span> : null}
-                    <span>{L.ref || `${L.from}→${L.to}`}</span>
-                    {L.cost ? <span className="num">{fmtMoney(L.cost, L.currency)}</span> : null}
-                    {!L.booked && <span className="est">not booked</span>}
+                    {L.depart ? `${L.depart} ` : ""}
+                    {L.ref || `${L.from}→${L.to}`}
+                    {L.cost ? ` ${fmtMoney(L.cost, L.currency)}` : ""}
+                    {!L.booked && <i>not booked</i>}
                   </button>
                 ))}
               </p>
@@ -186,22 +188,24 @@ export default function Itinerary({ trip, update, readOnly, onGo }) {
               <div key={it.id} className={`docitem${it.done ? " done" : ""}`}>
                 <input type="checkbox" checked={it.done} disabled={readOnly || locked} aria-label="Done"
                   onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, done: e.target.checked } : y)) }))} />
-                <input className="bare time" value={it.time} disabled={readOnly || locked} placeholder="time"
+                <input className="bare time" value={it.time} disabled={readOnly || locked} placeholder=""
                   onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, time: e.target.value } : y)) }))} />
                 <input className="bare grow" value={it.title} disabled={readOnly || locked} placeholder="What is it?"
                   onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, title: e.target.value } : y)) }))} />
-                <select value={it.kind} disabled={readOnly || locked} className="kindpick"
-                  onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, kind: e.target.value } : y)) }))}>
-                  {ITEM_KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
-                </select>
                 <Amount bare value={it.cost} currency={it.currency} disabled={readOnly || locked}
-                  placeholder="cost"
+                  placeholder=""
                   onChange={({ value, currency }) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, cost: value, currency } : y)) }))} />
-                <input className="bare url" value={it.url} disabled={readOnly || locked} placeholder="link"
-                  onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, url: e.target.value } : y)) }))} />
                 {it.url && <a href={it.url} target="_blank" rel="noreferrer" className="tiny">↗</a>}
-                <Btn className="sm" kind="danger" disabled={readOnly || locked}
-                  onClick={() => setDay(iso, (x) => ({ ...x, items: x.items.filter((y) => y.id !== it.id) }))}>×</Btn>
+                <span className="docitem-more">
+                  <select value={it.kind} disabled={readOnly || locked} className="kindpick"
+                    onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, kind: e.target.value } : y)) }))}>
+                    {ITEM_KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+                  </select>
+                  <input className="bare url" value={it.url} disabled={readOnly || locked} placeholder="link"
+                    onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, url: e.target.value } : y)) }))} />
+                  <Btn className="sm" kind="danger" disabled={readOnly || locked}
+                    onClick={() => setDay(iso, (x) => ({ ...x, items: x.items.filter((y) => y.id !== it.id) }))}>×</Btn>
+                </span>
               </div>
             ))}
 

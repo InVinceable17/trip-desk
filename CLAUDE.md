@@ -49,6 +49,12 @@ stored, and it must stay that way: an entry leaves because the trip changed, not
 because somebody ticked it. A shelf that never empties is decoration, so
 `test.mjs` asserts a fully-decided trip returns `[]`.
 
+**The tabs must stay pinned.** They went missing once already: under 900px
+the columns stack and the workbench sits below the *entire* itinerary, and
+inside the sticky column the panel is taller than the viewport. Un-pinned, the
+nav is off screen in both cases. `.tabs` is `position: sticky` in every layout
+and `check.mjs` asserts it at two widths.
+
 **A control hidden behind `:hover` still needs height on touch.** The per-day
 add row is `height: 0` until hover; the phone breakpoint has to restore both
 `height` and `opacity`, and `check.mjs` has to `hover()` before it clicks. Only

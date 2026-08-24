@@ -135,6 +135,26 @@ await p.waitForTimeout(250);
 
 console.log("\nthe ribbon accumulates");
 const layers = () => p.evaluate(() => [...document.querySelectorAll(".ribbon .tl-row")].map((r) => r.className.split(" ")[1]));
+/* The workbench stacks below the whole itinerary under 900px, and inside the
+   scrolling column the panel is taller than the viewport. Un-pinned, the nav
+   is off screen in both cases - which is exactly how it went missing. */
+check("the tabs are pinned, so navigation is never scrolled away",
+  (await p.evaluate(() => getComputedStyle(document.querySelector(".tabs")).position)) === "sticky");
+await p.setViewportSize({ width: 820, height: 900 });
+await p.waitForTimeout(250);
+check("still pinned once the columns stack",
+  (await p.evaluate(() => getComputedStyle(document.querySelector(".tabs")).position)) === "sticky");
+check("and stacked means one column, document first", await p.evaluate(() => {
+  const d = document.querySelector(".desk-doc"), w = document.querySelector(".desk-work");
+  return d.getBoundingClientRect().bottom <= w.getBoundingClientRect().top + 1;
+}));
+await p.setViewportSize({ width: 1280, height: 1500 });
+await p.waitForTimeout(250);
+check("wide enough, the document takes a third and the workbench two", await p.evaluate(() => {
+  const d = document.querySelector(".desk-doc").getBoundingClientRect().width;
+  const w = document.querySelector(".desk-work").getBoundingClientRect().width;
+  return Math.abs(w / d - 2) < 0.15;
+}));
 check("the tabs sit above the ribbon, both inside the workbench column", await p.evaluate(() => {
   const t = document.querySelector(".desk-work .tabs"), r = document.querySelector(".desk-work .ribbon");
   return !!(t && r) && (t.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;

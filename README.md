@@ -65,11 +65,19 @@ Publish `dist/artifact.html` with the Artifact tool, declaring:
 
 ## The desk
 
-Two columns. **Left** is the itinerary: every day of the trip, top to bottom,
-always on screen, written in prose. It is never navigated away from, so there is
-always an answer to "what is this trip" without clicking anything. **Right** is
-the workbench — Dates, Transport, Cities, Stays — plus the ribbon above it. On a
-phone the two stack, document first, and the tabs become the bottom bar.
+Two columns, a third and two thirds. **Left** is the itinerary: every day of the
+trip, top to bottom, always on screen. It is never navigated away from, so there
+is always an answer to "what is this trip" without clicking anything. **Right**
+is the workbench — Dates, Transport, Cities, Stays — plus the ribbon above it.
+Under 900px the two stack, document first; under 768px the tabs become the
+bottom bar. The tabs are `position: sticky` in every layout, because in both the
+stacked and the scrolling case an un-pinned nav ends up off screen.
+
+The document is a **notepad**: one continuous page of text, no rules between
+days, no chips, no card edges, nothing to expand. Anything you can operate —
+the add row, the kind dropdown, the link field, lock — stays invisible until
+the pointer is on the day it belongs to, so at rest the column reads rather
+than presents.
 
 The document *reads* like a word processor and is edited in place, but it is not
 a text buffer: every keystroke lands in a typed field. Parsing prose back into

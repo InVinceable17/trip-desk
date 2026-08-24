@@ -146,23 +146,29 @@ body {
 }
 
 /* ------------------------------------------------------------------ desk */
-/* Two columns: the trip as written, and the place you work it out. The
-   document is the wide, quiet one and never goes away; the workbench sticks
-   to the top so it stays reachable however far down the itinerary you are. */
+/* A third for the trip as written, two thirds for working it out. The
+   workbench sticks and scrolls itself, so the tabs stay reachable however far
+   down the itinerary you are — the whole point of having two columns. */
 .desk { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
 .desk-doc, .desk-work { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 
-@media (min-width: 1080px) {
-  .desk { grid-template-columns: minmax(400px, 1fr) minmax(540px, 1.1fr); }
-  .desk-work { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
-  /* The sticky column scrolls itself; hide its bar until it's wanted. */
-  .desk-work { scrollbar-width: thin; }
+@media (min-width: 900px) {
+  .desk { grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr); }
+  .desk-work {
+    position: sticky; top: 12px; max-height: calc(100vh - 24px);
+    overflow-y: auto; scrollbar-width: thin;
+  }
 }
 
 /* ------------------------------------------------------------------ tabs */
 /* Four places to work, in no order. The dot carries phaseState, so progress
-   stays legible without a number implying you are behind on it. */
+   stays legible without a number implying you are behind on it.
+
+   Sticky in every layout. Stacked, the workbench sits below the whole
+   itinerary; inside the scrolling column, the panel is taller than the
+   viewport. Either way an un-pinned nav is one you have to go looking for. */
 .tabs {
+  position: sticky; top: 0; z-index: 6;
   display: flex; gap: 2px; background: var(--line-soft); border: 1px solid var(--line);
   border-radius: 3px; padding: 2px; overflow-x: auto;
 }
@@ -200,90 +206,107 @@ body {
 .ask.flat:hover { color: var(--muted); border-color: var(--line); }
 
 /* ------------------------------------------------------------- itinerary */
-/* The trip as a document. No card borders inside it, no rows to expand — it
-   is meant to read like something typed in a word processor and to be edited
-   in place. The structure above the prose is derived and opens a panel. */
+/* A notepad. One continuous page of text: no rules between days, no chips, no
+   card edges, nothing to expand. Everything you can operate is invisible until
+   the pointer is on the day it belongs to, so at rest the column reads rather
+   than presents. Tight leading on purpose — the whole trip should stack into
+   as little height as it honestly can. */
 .doc {
   background: var(--card); border: 1px solid var(--line); border-radius: 2px;
-  box-shadow: var(--shadow); padding: 24px 28px 28px;
+  box-shadow: var(--shadow); padding: 16px 18px 20px;
+  font-size: 13px; line-height: 1.45;
 }
-.doc-blank { color: var(--muted); font-size: 14px; margin: 0; }
+.doc-blank { color: var(--muted); font-size: 13px; margin: 0; }
 .doc-top {
   display: flex; align-items: center; gap: 10px;
-  padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+  padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line-soft);
+  opacity: .45; transition: opacity .12s ease;
 }
+.doc:hover .doc-top, .doc-top:focus-within { opacity: 1; }
 
-.docday {
-  padding: 12px 0 13px; border-top: 1px solid var(--line-soft);
-  border-left: 2px solid transparent; padding-left: 12px; margin-left: -12px;
-}
-.docday:first-child { border-top: 0; padding-top: 2px; }
-.docday.moving { border-left-color: var(--dayhue, var(--line)); }
-.docday.locked { opacity: .72; }
+.docday { padding: 0 0 9px; border: 0; }
+.docday.locked { opacity: .68; }
 
+/* The heading is a line of text, not a row of controls. */
 .docday-head {
-  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
-  margin: 0 0 6px; font-size: 15px; font-weight: 400;
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  margin: 0; font-size: 13px; font-weight: 400; line-height: 1.45;
 }
-.docday-when { display: inline-flex; align-items: baseline; gap: 7px; flex: 0 0 auto; }
-.docday-dow {
-  font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--muted);
-}
-.docday-date { font-weight: 700; letter-spacing: -.01em; }
+.docday-date { font-weight: 700; letter-spacing: -.01em; flex: 0 0 auto; }
 .docday-where {
-  background: none; border: 0; padding: 1px 5px; margin-left: -3px; cursor: pointer; border-radius: 2px;
-  font-family: var(--sans); font-size: 15px; color: var(--dayhue, var(--ink));
+  background: none; border: 0; padding: 0; cursor: pointer; border-radius: 2px;
+  font: inherit; color: var(--dayhue, var(--muted));
 }
-.docday-where:hover { background: var(--accent-soft); }
-.docday-where .arrow { color: var(--muted); font-size: 12px; }
-.docday-trip { display: inline-flex; align-items: baseline; gap: 5px; }
-.docday-trip .arrow { color: var(--muted); font-size: 12px; }
-.docday-trip input.bare { width: 130px; border-color: var(--line); background: var(--card); }
+.docday-where:hover { text-decoration: underline; }
+.docday-where .arrow { font-size: 11px; }
+.docday-edge { color: var(--muted); font-size: 11px; }
+.docday-edge::before { content: "\00b7\00a0"; }
+.docday-trip { display: inline-flex; align-items: baseline; gap: 4px; }
+.docday-trip .arrow { color: var(--muted); font-size: 11px; }
+.docday-trip input.bare { width: 110px; font-size: 13px; padding: 0 3px; }
 
-.docday-acts { display: inline-flex; gap: 10px; opacity: 0; transition: opacity .12s ease; }
+.docday-acts {
+  display: inline-flex; gap: 9px; opacity: 0; transition: opacity .12s ease;
+  font-size: 11px;
+}
 .docday:hover .docday-acts, .docday:focus-within .docday-acts { opacity: 1; }
-.docday.locked .docday-acts { opacity: 1; }
+.docday.locked .docday-acts { opacity: .8; }
 .docday-acts .linkbtn.on { color: var(--accent-ink); }
 
-/* Derived facts about the day — what bed, what moves. Read-only here. */
-.docday-ctx { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+/* The day's derived facts, as a sentence rather than a row of badges. */
+.docday-ctx { display: block; margin: 0; color: var(--muted); font-size: 12px; }
 .ctxbit {
-  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-  font-family: var(--mono); font-size: 10.5px; color: var(--muted);
-  background: var(--sunk); border: 1px solid var(--line-soft);
-  border-radius: 2px; padding: 3px 8px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
 }
-.ctxbit:hover { color: var(--accent-ink); border-color: var(--accent); }
-.ctxbit.booked { color: var(--good); border-color: var(--good-soft); background: var(--good-soft); }
+.ctxbit + .ctxbit::before { content: "\00a0\00b7\00a0"; }
+.ctxbit:hover { color: var(--accent-ink); text-decoration: underline; }
+.ctxbit.booked { color: var(--good); }
+.ctxbit i { font-style: normal; opacity: .7; }
+.ctxbit i::before { content: " ("; }
+.ctxbit i::after { content: ")"; }
 
-/* The prose. This is the part that has to feel like a document. */
+/* The prose. */
 .docnotes {
   width: 100%; border: 0; background: none; resize: none; overflow: hidden;
-  font-family: var(--sans); font-size: 14.5px; line-height: 1.62; color: var(--ink);
-  padding: 2px 0; margin: 0; display: block;
+  font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink);
+  padding: 0; margin: 0; display: block; min-height: 1.5em;
 }
 .docnotes::placeholder { color: var(--muted); opacity: 0; transition: opacity .12s ease; }
-.docday:hover .docnotes::placeholder, .docnotes:focus::placeholder { opacity: .6; }
-.docnotes { min-height: 1.62em; }
-.docnotes:focus { outline: none; box-shadow: -10px 0 0 var(--accent-soft); }
+.docday:hover .docnotes::placeholder, .docnotes:focus::placeholder { opacity: .55; }
+.docnotes:focus { outline: none; box-shadow: -8px 0 0 var(--accent-soft); }
 .docnotes:disabled { color: var(--ink); opacity: 1; }
 
-.docitem { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 0; }
+.docitem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
 .docitem.done .bare.grow { text-decoration: line-through; color: var(--muted); }
-.docitem .kindpick { font-size: 10px; flex: 0 0 auto; }
-/* The title is the part worth reading, so it takes the room and the
-   accessories give way — otherwise every field ends up equally illegible. */
-.docitem input.bare.grow { flex: 1 1 170px; min-width: 130px; }
-.docitem input.time { flex: 0 0 58px; width: 58px; }
-.docitem input.url { flex: 1 1 80px; width: auto; min-width: 60px; }
+.docitem input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
+.docitem input.bare { font-size: 13px; padding: 0 3px; }
+.docitem input.bare.grow { flex: 1 1 140px; min-width: 100px; }
+.docitem input.time { flex: 0 0 52px; width: 52px; font-family: var(--mono); font-size: 11.5px; }
 .docitem .amount { flex: 0 0 auto; }
+.docitem .amount input.num { width: 52px; font-size: 11.5px; padding: 0 3px; }
+.docitem .amount .curpick {
+  border-color: transparent; background: none; width: auto;
+  font-size: 10px; padding: 0 2px; color: var(--muted);
+}
+.docitem:hover .amount .curpick { border-color: var(--line-soft); }
+/* Kind, link and delete are machinery, not content. */
+.docitem-more {
+  display: inline-flex; align-items: center; gap: 5px;
+  width: 0; overflow: hidden; opacity: 0; transition: opacity .12s ease;
+}
+.docitem:hover .docitem-more, .docitem:focus-within .docitem-more {
+  width: auto; overflow: visible; opacity: 1;
+}
+.docitem-more .kindpick { font-size: 10px; padding: 1px 3px; }
+.docitem-more input.url { width: 90px; font-size: 11px; }
+
 .docday-add {
   display: flex; gap: 12px; height: 0; overflow: hidden; opacity: 0;
-  transition: opacity .12s ease;
+  transition: opacity .12s ease; font-size: 11px;
 }
 .docday:hover .docday-add, .docday:focus-within .docday-add {
-  height: auto; opacity: 1; padding-top: 6px;
+  height: auto; opacity: 1; padding-top: 3px;
 }
 
 /* --------------------------------------------------------------- banners */
