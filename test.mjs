@@ -199,7 +199,7 @@ import {
   blankTrip, hydrateTrip, migrateV1, tripDays, tripNights, ptoNote,
   segmentSpans, cityForDay, moveBoundary, resizeLast, assignedNights,
   cityFlags, tripCost, phaseState, openBookings, indexEntry, blankSegment,
-  blankStay, blankItem, isTransitStop, unplannedMoves,
+  blankStay, blankItem, isTransitStop, unplannedMoves, openQuestions,
 } from "./src/model.js";
 
 /* The exact shape the live v1 artifact stores. */
@@ -1123,6 +1123,90 @@ ok("only a confirmed, never-initialised workspace seeds", () => {
 });
 ok("a missing argument never lands on seed by accident", () => {
   assert.equal(readVerdict({ fromCache: true }), "unknown");
+});
+
+/* --------------------------------------------------------- open questions */
+/* The shelf that replaced the numbered stepper. It has to name what is
+   unsettled without inventing work, and it must never behave like a checklist
+   - an entry leaves because the trip changed, not because it was ticked. */
+
+console.log("\nopen questions");
+
+const asks = (t) => openQuestions(t).map((q) => q.id);
+
+ok("a blank trip asks for dates first, and says they block", () => {
+  const q = openQuestions(blankTrip("X"));
+  assert.equal(q[0].id, "dates");
+  assert.equal(q[0].blocking, true);
+  assert.equal(q[0].panel, "dates");
+});
+ok("with dates but no cities, cities is the blocking question", () => {
+  const t = trip();
+  t.segments = [];
+  const q = openQuestions(t);
+  const cities = q.find((x) => x.id === "cities");
+  assert.ok(cities, "expected a cities question");
+  assert.equal(cities.blocking, true);
+  assert.ok(!q.some((x) => x.id === "dates" || x.id === "dates-lock"), "settled dates should stop asking");
+});
+ok("unassigned nights are counted, in the right direction", () => {
+  const t = trip();
+  t.segments = [{ id: "s1", city: "Rome", nights: 4, locked: false }];
+  assert.equal(openQuestions(t).find((x) => x.id === "nights").text, "7 nights not spoken for");
+  t.segments = [{ id: "s1", city: "Rome", nights: 14, locked: false }];
+  assert.equal(openQuestions(t).find((x) => x.id === "nights").text, "3 nights more than the trip is long");
+});
+ok("a single night reads as a night, not 1 nights", () => {
+  const t = trip();
+  t.segments = [{ id: "s1", city: "Rome", nights: 10, locked: false }];
+  assert.equal(openQuestions(t).find((x) => x.id === "nights").text, "1 night not spoken for");
+});
+ok("nights adding up stops the count and starts asking about locking", () => {
+  const t = lockedTrip();
+  assert.ok(!asks(t).includes("nights"));
+  assert.ok(!asks(t).includes("cities-lock"), "all locked, nothing to ask");
+  assert.ok(asks(trip()).includes("cities-lock"));
+});
+ok("every unnamed city raises one question, not one each", () => {
+  const t = trip();
+  t.segments = t.segments.map((x) => ({ ...x, city: "" }));
+  assert.equal(asks(t).filter((id) => id === "unnamed").length, 1);
+});
+ok("a bed question names the city and softens once places are shortlisted", () => {
+  const t = lockedTrip();
+  const first = openQuestions(t).find((x) => x.id === "bed:s1");
+  assert.equal(first.text, "Where do you sleep in Rome?");
+  assert.equal(first.panel, "stays");
+  t.stays = [{ ...blankStay("s1"), name: "Artemide", status: "Maybe" }];
+  assert.equal(openQuestions(t).find((x) => x.id === "bed:s1").text, "Rome: 1 place in the running");
+  t.stays = [{ ...blankStay("s1"), name: "Artemide", status: "Booked" }];
+  assert.ok(!asks(t).includes("bed:s1"), "a booked bed is a settled question");
+});
+ok("a ruled-out place is not a place in the running", () => {
+  const t = lockedTrip();
+  t.stays = [{ ...blankStay("s1"), name: "No", status: "Ruled out" }];
+  assert.equal(openQuestions(t).find((x) => x.id === "bed:s1").text, "Where do you sleep in Rome?");
+});
+ok("unbought tickets surface once, with no panel to send you to", () => {
+  const t = lockedTrip();
+  t.days = {
+    "2026-10-13": { notes: "", city: "", locked: false, items: [{ ...blankItem("ticket"), title: "Colosseum" }] },
+    "2026-10-14": { notes: "", city: "", locked: false, items: [{ ...blankItem("reservation"), title: "Dinner" }] },
+  };
+  const q = openQuestions(t).find((x) => x.id === "tickets");
+  assert.equal(q.text, "2 things still to book");
+  assert.equal(q.panel, "");
+});
+ok("nothing is asked about a trip with every decision made", () => {
+  const t = lockedTrip();
+  t.flights.options = [{ id: "o1", out: {}, ret: {} }];
+  t.flights.bookedId = "o1";
+  t.travel = [
+    { id: "t1", date: "2026-10-16", booked: true },
+    { id: "t2", date: "2026-10-19", booked: true },
+  ];
+  t.stays = t.segments.map((sg) => ({ ...blankStay(sg.id), name: sg.city, status: "Booked" }));
+  assert.deepEqual(openQuestions(t), []);
 });
 
 console.log(`\n${pass} checks passed\n`);

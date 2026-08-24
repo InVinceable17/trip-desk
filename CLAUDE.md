@@ -30,6 +30,30 @@ build was unconfigured, and went stale the day the project got a config — a
 failure nobody saw, because a hardcoded Linux browser path meant the suite had
 never run here at all.
 
+## Two columns, and what the left one is not
+
+The left column is the whole trip as one editable document (`views/Itinerary.jsx`);
+the right is the workbench (Dates, Transport, Cities, Stays) with the ribbon
+above it. The document is never navigated away from.
+
+**The document is not a text buffer.** It reads and edits like a word processor,
+but every keystroke lands in a typed field — `days[iso].notes`, an item title, a
+day-trip city. Making it a real buffer that parses back into structure would
+re-run the lossy prose→structure problem on every keystroke and destabilise the
+ids that keep a renamed hotel distinguishable from a replaced one. That is what
+`doc-parse.js`/`doc-sync.js` already pay for, and the Source panel is the only
+place it belongs.
+
+**`openQuestions()` replaced the numbered stepper.** It is derived, never
+stored, and it must stay that way: an entry leaves because the trip changed, not
+because somebody ticked it. A shelf that never empties is decoration, so
+`test.mjs` asserts a fully-decided trip returns `[]`.
+
+**A control hidden behind `:hover` still needs height on touch.** The per-day
+add row is `height: 0` until hover; the phone breakpoint has to restore both
+`height` and `opacity`, and `check.mjs` has to `hover()` before it clicks. Only
+setting `opacity` leaves a zero-height button the page swallows clicks for.
+
 ## The doc behind a trip
 
 A trip can be a structured view of a Google Doc somebody else actually writes
@@ -61,8 +85,9 @@ stale one. This is deliberate — see the comment above `key()` in `doc-sync.js`
 
 Below 768px `page.html` restyles the app: system font for prose, mono kept for
 codes and money, 44px targets, 16px inputs (anything smaller makes iOS zoom on
-focus and never zoom back), and the phase stepper fixed to the bottom as a tab
-bar. Above that breakpoint nothing changed — the Gantt desk is untouched. The
+focus and never zoom back), and the workbench tabs fixed to the bottom as a tab
+bar. Above 1080px the app is two columns; below that the two stack, itinerary
+first, and a tab tap scrolls the workbench up to meet the thumb. The
 `:has()` rule that stands the wordmark down when a trip is open has an
 `@supports not` fallback.
 
