@@ -362,8 +362,10 @@ function Tabs({ trip, panel, onGo }) {
       {PANELS.map((p) => {
         const st = phaseState(trip, p.key);
         const on = p.key === panel;
+        // `is-` prefixed: phaseState returns "empty", and a bare `empty` class
+        // collides with the global empty-state rule (padding: 22px 0).
         return (
-          <button key={p.key} className={`tab ${st}${on ? " on" : ""}`}
+          <button key={p.key} className={`tab is-${st}${on ? " on" : ""}`}
             aria-current={on ? "page" : undefined}
             onClick={() => { onGo(p.key); reach(); }}>
             <i className={`dot is-${st}`} aria-hidden="true" />

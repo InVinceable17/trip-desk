@@ -49,6 +49,25 @@ stored, and it must stay that way: an entry leaves because the trip changed, not
 because somebody ticked it. A shelf that never empties is decoration, so
 `test.mjs` asserts a fully-decided trip returns `[]`.
 
+**Never give a component a state class that is also a global class name.**
+`phaseState` returns `"empty"`, and the tab bar rendered it as
+`class="tab empty"` — inheriting `.empty { padding: 22px 0 }`, the global
+empty-state rule. The two untouched tabs came out double height and the bar
+grew with them. State classes are `is-` prefixed for exactly this reason.
+
+**Assert the box, not the declaration.** The first version of the tab test
+checked `getComputedStyle(.tabs).position === "sticky"`. It passed while the
+bar rendered six pixels tall, and passed again when two of four tabs were
+twice the height of the others. `check.mjs` now measures height, per-tab
+height, and single-row layout — and that version fails when the collision is
+put back.
+
+**A scrolling flex column shrinks its children instead of scrolling.**
+`.desk-work` has `max-height` plus `overflow-y: auto`; its children default to
+`flex-shrink: 1`, and `.tabs` sets `overflow-x`, which zeroes its automatic
+minimum size. The navigation was the first thing crushed. `.desk-work > *`
+is `flex: 0 0 auto`.
+
 **The tabs must stay pinned.** They went missing once already: under 900px
 the columns stack and the workbench sits below the *entire* itinerary, and
 inside the sticky column the panel is taller than the viewport. Un-pinned, the

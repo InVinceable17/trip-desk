@@ -70,7 +70,7 @@ check("counts weekdays to book off", /10 weekday/.test(await p.textContent(".rea
 await p.click("button:has-text('Lock these dates')");
 await p.waitForTimeout(300);
 check("locks the dates", (await p.locator(".chip.st-booked").count()) > 0);
-check("dates tab now reads done", (await p.locator(".tab.done").count()) >= 1);
+check("dates tab now reads done", (await p.locator(".tab.is-done").count()) >= 1);
 check("and the shelf stops asking about dates",
   !/going|dates settled/.test(await p.textContent(".asks")), await p.textContent(".asks"));
 
@@ -138,12 +138,35 @@ const layers = () => p.evaluate(() => [...document.querySelectorAll(".ribbon .tl
 /* The workbench stacks below the whole itinerary under 900px, and inside the
    scrolling column the panel is taller than the viewport. Un-pinned, the nav
    is off screen in both cases - which is exactly how it went missing. */
-check("the tabs are pinned, so navigation is never scrolled away",
-  (await p.evaluate(() => getComputedStyle(document.querySelector(".tabs")).position)) === "sticky");
+const tabBox = () => p.evaluate(() => {
+  const t = document.querySelector(".tabs");
+  const kids = [...t.children].map((c) => Math.round(c.getBoundingClientRect().height));
+  return {
+    h: Math.round(t.getBoundingClientRect().height),
+    position: getComputedStyle(t).position,
+    kids,
+    sameHeight: new Set(kids).size === 1,
+    oneRow: new Set([...t.children].map((c) => Math.round(c.getBoundingClientRect().y))).size === 1,
+  };
+});
+const bar = await tabBox();
+check("the tab bar is an actual bar, not a sliver", bar.h > 28 && bar.h < 52, bar);
+check("every tab is the same height, on one row", bar.sameHeight && bar.oneRow, bar);
+check("the tabs are pinned, so navigation is never scrolled away", bar.position === "sticky", bar);
+check("and pinning holds when the workbench scrolls", await p.evaluate(async () => {
+  const w = document.querySelector(".desk-work");
+  const t = document.querySelector(".tabs");
+  w.scrollTop = 600;
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return t.getBoundingClientRect().top >= w.getBoundingClientRect().top - 1;
+}));
+await p.evaluate(() => { document.querySelector(".desk-work").scrollTop = 0; });
 await p.setViewportSize({ width: 820, height: 900 });
 await p.waitForTimeout(250);
-check("still pinned once the columns stack",
-  (await p.evaluate(() => getComputedStyle(document.querySelector(".tabs")).position)) === "sticky");
+const stackedBox = await tabBox();
+check("still pinned, and still a bar, once the columns stack",
+  stackedBox.position === "sticky" && stackedBox.h > 28 && stackedBox.h < 52
+  && stackedBox.sameHeight, stackedBox);
 check("and stacked means one column, document first", await p.evaluate(() => {
   const d = document.querySelector(".desk-doc"), w = document.querySelector(".desk-work");
   return d.getBoundingClientRect().bottom <= w.getBoundingClientRect().top + 1;

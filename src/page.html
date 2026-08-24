@@ -158,6 +158,15 @@ body {
     position: sticky; top: 12px; max-height: calc(100vh - 24px);
     overflow-y: auto; scrollbar-width: thin;
   }
+  /* A flex column with a max-height shrinks its children to fit rather than
+     letting the box scroll. `.tabs` sets overflow-x, which zeroes its
+     automatic minimum size, so it was the first thing crushed — a 6px sliver
+     where the navigation should be. In a column that scrolls, nothing shrinks. */
+  /* A flex column with a max-height shrinks its children to fit rather than
+     letting the box scroll, and `.tabs` sets overflow-x, which zeroes its
+     automatic minimum size — so the navigation was the first thing crushed,
+     down to a 6px sliver. In a column that scrolls, nothing shrinks. */
+  .desk-work > * { flex: 0 0 auto; }
 }
 
 /* ------------------------------------------------------------------ tabs */
@@ -173,7 +182,7 @@ body {
   border-radius: 3px; padding: 2px; overflow-x: auto;
 }
 .tab {
-  flex: 1 1 0; min-width: 84px; display: flex; align-items: center; justify-content: center; gap: 7px;
+  flex: 1 1 0; min-width: 84px; line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 7px;
   background: var(--card); border: 0; border-radius: 2px; cursor: pointer;
   padding: 9px 10px; color: var(--muted);
   font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
@@ -181,6 +190,8 @@ body {
 }
 .tab:hover { color: var(--ink); }
 .tab.on { background: var(--accent); color: var(--on-accent); }
+/* Never `.tab.empty` — that is the global empty-state rule's name. */
+.tab.is-empty { padding: 9px 10px; }
 .tab .dot {
   width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
   background: none; box-shadow: inset 0 0 0 1px currentColor;
