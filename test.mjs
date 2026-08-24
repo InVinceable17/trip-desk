@@ -4,6 +4,7 @@ import { parseFares, parseFareBlocks, parseSearchRows, parseFlightNo, parsePaste
 import { searchUrl, fareUrl, DEFAULT_CONFIG } from "./src/flights.js";
 import { parseDoc, parseDocText, parseDocJson, parseDateRange, parseOneDate, importPrompt } from "./src/doc-parse.js";
 import { applyDoc, driftList, compare, acceptDoc, keepMine, detach, fieldValue } from "./src/doc-sync.js";
+import { readVerdict } from "./src/store-common.js";
 
 
 let pass = 0;
@@ -1023,6 +1024,30 @@ ok("an old trip with no source block still opens", () => {
   const t = blankTrip("Old");
   delete t.source;
   assert.deepEqual(driftList(hydrateTrip(t)), []);
+});
+
+
+/* ------------------------------------------------- what an empty read means */
+/* Firestore returns an empty result, not an error, when it is offline with a
+   cold cache. Treating that as "the workspace is new" is how a phone on a bad
+   connection seeds the sample trip over a real index. */
+
+ok("trips that came back are trusted, cached or not", () => {
+  assert.equal(readVerdict({ fromCache: true, indexExists: true, tripCount: 3 }), "open");
+  assert.equal(readVerdict({ fromCache: false, indexExists: true, tripCount: 3 }), "open");
+});
+ok("empty from the cache proves nothing and must not seed", () => {
+  assert.equal(readVerdict({ fromCache: true, indexExists: true, tripCount: 0 }), "unknown");
+  assert.equal(readVerdict({ fromCache: true, indexExists: false, tripCount: 0 }), "unknown");
+});
+ok("a desk emptied on purpose stays empty", () => {
+  assert.equal(readVerdict({ fromCache: false, indexExists: true, tripCount: 0 }), "open");
+});
+ok("only a confirmed, never-initialised workspace seeds", () => {
+  assert.equal(readVerdict({ fromCache: false, indexExists: false, tripCount: 0 }), "seed");
+});
+ok("a missing argument never lands on seed by accident", () => {
+  assert.equal(readVerdict({ fromCache: true }), "unknown");
 });
 
 console.log(`\n${pass} checks passed\n`);

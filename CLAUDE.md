@@ -16,7 +16,7 @@ claude.ai and a hosted build for GitHub Pages. `README.md` covers the app,
 ```
 npm run build:web    # -> docs/   (hosted, Firestore-backed)
 npm run build        # -> dist/   (artifact, artifact-file-backed)
-npm test             # 147 unit checks, fast, no browser
+npm test             # 152 unit checks, fast, no browser
 npm run all          # both builds + every suite
 ```
 
@@ -79,6 +79,25 @@ error therefore takes the same path as an absent file: the build *succeeds*
 and silently emits an app with no backend. The console hands you a JavaScript
 object literal with unquoted keys, which is not JSON — quote them. Always
 confirm the last build line reads `configured for Firebase project "..."`.
+
+**An empty Firestore read is not evidence that the workspace is empty.**
+Offline with a cold cache, `getDocs` returns an empty snapshot and *no error*.
+`loadAll` used to treat that as a brand-new desk: it seeded the sample trip and
+returned `migrated: true`, which makes `app.jsx` save immediately — writing the
+seed order over a perfectly good `meta/index` from a phone that had simply not
+reached the server yet. Worse, `idx.order.filter((id) => trips[id])` drops every
+id when `trips` is empty, so even a healthy index computed to length zero.
+
+`readVerdict()` in `store-common.js` now decides: data is trusted cached or not,
+empty-from-cache is `"unknown"` (fall back to this browser's copy and write
+nothing), an existing index means the desk was emptied on purpose, and only a
+server-confirmed read with no index at all may seed. Never make seeding
+reachable from a failed read — seeding writes.
+
+Note the saver rewrites `meta/index` wholesale on every flush, so any device can
+reorder the index from its own partial view. Trips themselves are only touched
+when dirty, so nothing is lost by this; a trip missing from the index is still
+loaded and appended.
 
 **`firestore.rules` in this repo is inert.** It does nothing until it is pasted
 into Firestore → Rules → Publish in the console. Committing it is not

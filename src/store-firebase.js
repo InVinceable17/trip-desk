@@ -28,7 +28,7 @@ import {
 } from "firebase/firestore";
 
 import { SCHEMA, hydrateTrip, indexEntry, seedTrips } from "./model.js";
-import { MODE, cacheStore, readCachedStore } from "./store-common.js";
+import { MODE, cacheStore, readCachedStore, readVerdict } from "./store-common.js";
 
 /* Injected at build time from firebase.config.json — see build-web.mjs. */
 const CONFIG = typeof __FIREBASE_CONFIG__ !== "undefined" ? __FIREBASE_CONFIG__ : null;
@@ -152,6 +152,10 @@ export function describeLoadError(e) {
     return "Couldn't reach Firestore, so these are the trips this browser had saved. "
       + "If this browser blocks site storage, that's usually the cause.";
   }
+  if (code === "unconfirmed") {
+    return "Couldn't confirm your trips against Firestore, so these are the ones this browser "
+      + "had saved. Nothing has been overwritten — reload once you have a connection.";
+  }
   if (code === "permission-denied") {
     return "Signed in, but this account isn't on the allowlist — showing what this browser had saved.";
   }
@@ -189,13 +193,26 @@ export async function loadAll() {
 
     const idx = idxSnap.exists() ? idxSnap.data() : null;
     const known = Object.keys(trips);
-    // The index only orders things; a trip missing from it is still a trip.
-    const order = idx && Array.isArray(idx.order)
-      ? [...idx.order.filter((id) => trips[id]), ...known.filter((id) => !idx.order.includes(id))]
-      : known;
 
-    if (!order.length) {
-      // A brand-new workspace opens onto the trip the app ships with.
+    /* Whether this read is worth acting on. Firestore returns an empty result
+       rather than an error when it is offline with a cold cache, so "no trips
+       came back" and "could not read the trips" are the same shape here. Only
+       one of them may lead to a write. */
+    const verdict = readVerdict({
+      fromCache: !!(idxSnap.metadata && idxSnap.metadata.fromCache)
+        || !!(tripSnaps.metadata && tripSnaps.metadata.fromCache),
+      indexExists: idxSnap.exists(),
+      tripCount: known.length,
+    });
+
+    if (verdict === "unknown") {
+      const e = new Error("Firestore answered from an empty local cache, so this read proves nothing.");
+      e.code = "unconfirmed";
+      throw e;                  // the catch below falls back to this browser's copy
+    }
+
+    if (verdict === "seed") {
+      // A genuinely new workspace opens onto the trip the app ships with.
       const seeded = {};
       const seedOrder = [];
       seedTrips().forEach((t) => { seeded[t.id] = t; seedOrder.push(t.id); });
@@ -205,6 +222,11 @@ export async function loadAll() {
         prefs: { seeded: true }, missing: [], migrated: true,
       };
     }
+
+    // The index only orders things; a trip missing from it is still a trip.
+    const order = idx && Array.isArray(idx.order)
+      ? [...idx.order.filter((id) => trips[id]), ...known.filter((id) => !idx.order.includes(id))]
+      : known;
 
     return {
       trips, order,
