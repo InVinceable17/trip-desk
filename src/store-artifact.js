@@ -31,6 +31,9 @@ export const HOSTED = false;
 /** No cross-device channel here — one artifact view is the only writer. */
 export const watchAll = null;
 export const describeAuthError = (e) => (e && e.message) || "Sign-in failed.";
+/* Both backends answer this so the app can report a bad load the same way,
+   whichever one it was built against. */
+export const describeLoadError = (e) => (e ? (e.message || "Couldn't load your trips.") : "");
 
 const readJson = async (path) => {
   try {

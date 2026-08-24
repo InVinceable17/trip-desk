@@ -22,7 +22,8 @@ import {
   onAuthStateChanged, signOut as fbSignOut,
 } from "firebase/auth";
 import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  initializeFirestore, persistentLocalCache,
+  persistentMultipleTabManager, persistentSingleTabManager,
   doc, getDoc, getDocs, setDoc, deleteDoc, collection, writeBatch, onSnapshot,
 } from "firebase/firestore";
 
@@ -36,9 +37,21 @@ let app = null, db = null, fbAuth = null;
 const ready = (() => {
   if (!CONFIG || !CONFIG.projectId) return false;
   app = initializeApp(CONFIG);
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  });
+  /* Persistence is a convenience, not a requirement, and it is the part most
+     likely to be unavailable: it needs IndexedDB, and the multi-tab manager
+     additionally needs a cross-tab lock. Chrome on a phone with restricted
+     site storage — or a private window — can refuse either. Insisting on the
+     richest option and letting it fail leaves the client unable to complete a
+     read at all, which surfaces as a spinner that never stops. So try for the
+     best cache available and settle for less rather than for nothing. */
+  const caches = [
+    () => ({ localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }),
+    () => ({ localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) }),
+    () => ({}),   // memory only: reads still work, they just do not survive a reload
+  ];
+  for (const make of caches) {
+    try { db = initializeFirestore(app, make()); break; } catch { /* try the next */ }
+  }
   fbAuth = getAuth(app);
   return true;
 })();
@@ -127,14 +140,48 @@ export function describeAuthError(e) {
 
 /* ------------------------------------------------------------------- read */
 
+/* Long enough that a slow phone on a bad connection still gets its real data,
+   short enough that a client which is never going to answer says so while you
+   are still looking at the screen. */
+const LOAD_TIMEOUT = 15000;
+
+/** What went wrong loading, in words, or "" when nothing did. */
+export function describeLoadError(e) {
+  const code = (e && e.code) || "";
+  if (code === "load-timeout") {
+    return "Couldn't reach Firestore, so these are the trips this browser had saved. "
+      + "If this browser blocks site storage, that's usually the cause.";
+  }
+  if (code === "permission-denied") {
+    return "Signed in, but this account isn't on the allowlist — showing what this browser had saved.";
+  }
+  if (code === "unavailable" || code.includes("network")) {
+    return "Offline, so these are the trips this browser had saved.";
+  }
+  return e ? "Couldn't load from Firestore — showing what this browser had saved." : "";
+}
+
 export async function loadAll() {
   if (!ready || !currentUser) {
     return { trips: {}, order: [], entries: [], prefs: {}, missing: [], migrated: false };
   }
   try {
-    const [idxSnap, tripSnaps] = await Promise.all([
-      getDoc(doc(db, "meta", "index")),
-      getDocs(collection(db, "trips")),
+    /* Firestore reads normally either resolve or reject. They can also do
+       neither: if the client cannot bring its local cache up, the read is
+       queued against a backend that never becomes ready and simply never
+       settles. Awaited bare, that is a spinner with no end and nothing to
+       report — so give it a deadline and treat silence as a failure like any
+       other. The catch below already knows how to fall back. */
+    const [idxSnap, tripSnaps] = await Promise.race([
+      Promise.all([
+        getDoc(doc(db, "meta", "index")),
+        getDocs(collection(db, "trips")),
+      ]),
+      new Promise((_, reject) => setTimeout(() => {
+        const e = new Error("Firestore didn't answer within 15 seconds.");
+        e.code = "load-timeout";
+        reject(e);
+      }, LOAD_TIMEOUT)),
     ]);
 
     const trips = {};

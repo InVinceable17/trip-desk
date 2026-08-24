@@ -5,7 +5,7 @@ import { label as dayLabel } from "./flights.js";
 import {
   PHASES, PHASE_KEYS, blankTrip, hydrateTrip, phaseState, tripCost, tripNights, indexEntry, fmtMoney,
 } from "./model.js";
-import { loadAll, makeSaver, MODE, auth, describeAuthError, HOSTED } from "./store.js";
+import { loadAll, makeSaver, MODE, auth, describeAuthError, describeLoadError, HOSTED } from "./store.js";
 import * as backend from "./backend.js";
 import { Btn, Spinner } from "./components/ui.jsx";
 import CostBreakdown from "./components/CostBreakdown.jsx";
@@ -78,6 +78,9 @@ function App() {
 
       const loaded = await loadAll();
       if (!alive) return;
+      // A degraded load still puts you in the app; it just says so rather than
+      // presenting whatever it salvaged as the whole truth.
+      if (loaded.error) setNote(describeLoadError(loaded.error));
       const next = { trips: loaded.trips, order: loaded.order, prefs: loaded.prefs };
       setDb(next);
       setMissing(loaded.missing || []);
