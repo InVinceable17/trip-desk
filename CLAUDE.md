@@ -91,6 +91,32 @@ that alert is expected. Rotating the key is pointless (the new one lands right
 back in the public bundle); restricting it by HTTP referrer is the real
 control.
 
+**Sign-in is popup-only, and the redirect flow must never come back.** The app
+is served from `invinceable17.github.io` while Firebase's auth handler lives on
+`trip-desk-ab201.firebaseapp.com`. The redirect flow matches its result to the
+pending sign-in through storage on that second origin, and every modern mobile
+browser partitions third-party storage — so the handler returns from Google
+holding a valid authorisation code, finds nothing to match, and stops on a white
+page. The documented fix is serving `/__/auth/handler` from the app's own
+domain, which static GitHub Pages cannot do. `check-web.mjs` asserts
+`signInWithRedirect` is absent from the bundle.
+
+**Restricting the API key by referrer must include the auth domain.** The key is
+restricted to `invinceable17.github.io/*`, which is the right control — but the
+sign-in handler runs on `trip-desk-ab201.firebaseapp.com` and calls Identity
+Toolkit with *that* as its referrer. Leave it off the allowed list and sign-in
+dies with Google's generic "The requested action is invalid." The website
+restrictions need both:
+
+```
+invinceable17.github.io/*
+trip-desk-ab201.firebaseapp.com/*
+```
+
+To check the key's restrictions without the console, POST to
+`identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=<key>` with a
+`Referer` header and see whether it comes back blocked.
+
 **Adding a traveller** is a rules change only: they sign in once so their UID
 exists, add it to `members()` in `firestore.rules`, publish. No redeploy.
 

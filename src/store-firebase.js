@@ -18,7 +18,7 @@
 
 import { initializeApp } from "firebase/app";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+  getAuth, GoogleAuthProvider, signInWithPopup, getRedirectResult,
   onAuthStateChanged, signOut as fbSignOut,
 } from "firebase/auth";
 import {
@@ -53,6 +53,13 @@ if (ready) {
     currentUser = u;
     listeners.forEach((fn) => fn(u));
   });
+
+  /* Anyone who tried to sign in while the redirect fallback still existed has a
+     half-finished redirect recorded in this origin's storage. Resolving it once
+     at boot clears it; it can never succeed, and left in place it makes the SDK
+     reach for the cross-origin handler on every load. Failure here is expected
+     and uninteresting. */
+  getRedirectResult(fbAuth).catch(() => {});
 }
 
 /** Running as an ordinary website — no Claude connectors reachable from here. */
@@ -67,30 +74,52 @@ export const auth = {
     fn(currentUser);
     return () => listeners.delete(fn);
   },
+  /**
+   * Popup only, deliberately.
+   *
+   * There used to be a `signInWithRedirect` fallback here for browsers that
+   * block popups. It cannot work in this deployment and could only ever strand
+   * you: the app is served from github.io while the auth handler lives on
+   * <project>.firebaseapp.com, and the redirect flow correlates its result with
+   * the pending sign-in through storage on that second origin. Every modern
+   * mobile browser partitions third-party storage, so the handler comes back
+   * from Google holding a perfectly good authorisation code, finds nothing to
+   * match it against, and stops on a white page.
+   *
+   * The documented fix is to serve /__/auth/handler from the app's own domain.
+   * GitHub Pages is static and cannot proxy, so that is not available. The
+   * popup has no such problem — it posts its result straight back to the opener
+   * rather than going through storage at all.
+   *
+   * This must stay callable synchronously from the click that triggers it, or
+   * Safari treats the popup as unsolicited and blocks it.
+   */
   async signIn() {
     if (!ready) throw new Error("Firebase isn't configured in this build.");
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(fbAuth, provider);
-    } catch (e) {
-      // Popups are blocked on plenty of mobile browsers; fall back rather than
-      // leaving the person staring at a button that does nothing.
-      const code = (e && e.code) || "";
-      if (/popup-blocked|popup-closed-by-user|operation-not-supported/.test(code)) {
-        await signInWithRedirect(fbAuth, provider);
-        return;
-      }
-      throw e;
-    }
+    await signInWithPopup(fbAuth, new GoogleAuthProvider());
   },
   signOut() { return ready ? fbSignOut(fbAuth) : Promise.resolve(); },
 };
 
-/** Turn a Firebase error into something worth reading. */
+/**
+ * Turn a Firebase error into something worth reading. Returns "" for the ones
+ * that are not failures at all — closing the sign-in window is a decision, and
+ * shouting about it is how an app teaches you to distrust its warnings.
+ */
 export function describeAuthError(e) {
   const code = (e && e.code) || "";
-  if (code.includes("popup-blocked")) return "Your browser blocked the sign-in window.";
+  if (code.includes("popup-closed-by-user")) return "";
+  if (code.includes("cancelled-popup-request")) return "";
+  if (code.includes("popup-blocked")) {
+    return "Your browser blocked the sign-in window. Allow pop-ups for this site, then try again.";
+  }
+  if (code.includes("operation-not-supported")) {
+    return "This browser won't open the sign-in window. Opening the site in a normal browser tab usually fixes it.";
+  }
   if (code.includes("unauthorized-domain")) return "This domain isn't in the Firebase authorised list yet.";
+  if (code.includes("requests-from-referer") || code.includes("api-key-not-valid")) {
+    return "The API key is restricted and doesn't allow this site. Check the key's website restrictions.";
+  }
   if (code.includes("network-request-failed")) return "No connection to Firebase.";
   if (code === "permission-denied") return "Signed in, but this account isn't on the allowlist.";
   return (e && e.message) || "Sign-in failed.";
