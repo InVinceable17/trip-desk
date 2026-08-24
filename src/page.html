@@ -89,7 +89,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.wrap { max-width: 1460px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .grow { flex: 1; }
 .mt8 { margin-top: 8px; }
@@ -145,180 +145,30 @@ body {
   color: var(--muted);
 }
 
-/* ------------------------------------------------------------------ desk */
-/* A third for the trip as written, two thirds for working it out. The
-   workbench sticks and scrolls itself, so the tabs stay reachable however far
-   down the itinerary you are — the whole point of having two columns. */
-.desk { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
-.desk-doc, .desk-work { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-
-@media (min-width: 900px) {
-  .desk { grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr); }
-  .desk-work {
-    position: sticky; top: 12px; max-height: calc(100vh - 24px);
-    overflow-y: auto; scrollbar-width: thin;
-  }
-  /* A flex column with a max-height shrinks its children to fit rather than
-     letting the box scroll. `.tabs` sets overflow-x, which zeroes its
-     automatic minimum size, so it was the first thing crushed — a 6px sliver
-     where the navigation should be. In a column that scrolls, nothing shrinks. */
-  /* A flex column with a max-height shrinks its children to fit rather than
-     letting the box scroll, and `.tabs` sets overflow-x, which zeroes its
-     automatic minimum size — so the navigation was the first thing crushed,
-     down to a 6px sliver. In a column that scrolls, nothing shrinks. */
-  .desk-work > * { flex: 0 0 auto; }
-}
-
-/* ------------------------------------------------------------------ tabs */
-/* Four places to work, in no order. The dot carries phaseState, so progress
-   stays legible without a number implying you are behind on it.
-
-   Sticky in every layout. Stacked, the workbench sits below the whole
-   itinerary; inside the scrolling column, the panel is taller than the
-   viewport. Either way an un-pinned nav is one you have to go looking for. */
-.tabs {
-  position: sticky; top: 0; z-index: 6;
+/* --------------------------------------------------------------- stepper */
+.stepper {
   display: flex; gap: 2px; background: var(--line-soft); border: 1px solid var(--line);
   border-radius: 3px; padding: 2px; overflow-x: auto;
 }
-.tab {
-  flex: 1 1 0; min-width: 84px; line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 7px;
+.step {
+  flex: 1 1 0; min-width: 96px; display: flex; align-items: center; justify-content: center; gap: 7px;
   background: var(--card); border: 0; border-radius: 2px; cursor: pointer;
   padding: 9px 10px; color: var(--muted);
   font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
   transition: background .12s ease, color .12s ease;
 }
-.tab:hover { color: var(--ink); }
-.tab.on { background: var(--accent); color: var(--on-accent); }
-/* Never `.tab.empty` — that is the global empty-state rule's name. */
-.tab.is-empty { padding: 9px 10px; }
-.tab .dot {
-  width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
-  background: none; box-shadow: inset 0 0 0 1px currentColor;
+.step:hover { color: var(--ink); }
+.step.on { background: var(--accent); color: var(--on-accent); }
+.step-n {
+  width: 17px; height: 17px; border-radius: 50%; flex: 0 0 auto;
+  display: grid; place-items: center; font-size: 10px;
+  border: 1px solid currentColor;
 }
-.tab .dot.is-started { background: currentColor; opacity: .45; }
-.tab .dot.is-done { background: currentColor; opacity: 1; box-shadow: none; }
-
-/* --------------------------------------------------------- open questions */
-/* What is still undecided, as a row of ways in. Not a checklist — nothing here
-   is ticked off, an item leaves because the trip changed. */
-.asks { display: flex; flex-wrap: wrap; gap: 6px; }
-.ask {
-  font-family: var(--mono); font-size: 11px; line-height: 1.4;
-  padding: 6px 11px; border-radius: 999px; cursor: pointer;
-  background: var(--card); color: var(--muted);
-  border: 1px solid var(--line);
-  transition: color .12s ease, border-color .12s ease;
-}
-.ask:hover { color: var(--accent-ink); border-color: var(--accent); }
-.ask.blocking { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
-.ask.blocking:hover { color: var(--warn); }
-.ask.flat { cursor: default; border-style: dashed; }
-.ask.flat:hover { color: var(--muted); border-color: var(--line); }
-
-/* ------------------------------------------------------------- itinerary */
-/* A notepad. One continuous page of text: no rules between days, no chips, no
-   card edges, nothing to expand. Everything you can operate is invisible until
-   the pointer is on the day it belongs to, so at rest the column reads rather
-   than presents. Tight leading on purpose — the whole trip should stack into
-   as little height as it honestly can. */
-.doc {
-  background: var(--card); border: 1px solid var(--line); border-radius: 2px;
-  box-shadow: var(--shadow); padding: 16px 18px 20px;
-  font-size: 13px; line-height: 1.45;
-}
-.doc-blank { color: var(--muted); font-size: 13px; margin: 0; }
-.doc-top {
-  display: flex; align-items: center; gap: 10px;
-  padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line-soft);
-  opacity: .45; transition: opacity .12s ease;
-}
-.doc:hover .doc-top, .doc-top:focus-within { opacity: 1; }
-
-.docday { padding: 0 0 9px; border: 0; }
-.docday.locked { opacity: .68; }
-
-/* The heading is a line of text, not a row of controls. */
-.docday-head {
-  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
-  margin: 0; font-size: 13px; font-weight: 400; line-height: 1.45;
-}
-.docday-date { font-weight: 700; letter-spacing: -.01em; flex: 0 0 auto; }
-.docday-where {
-  background: none; border: 0; padding: 0; cursor: pointer; border-radius: 2px;
-  font: inherit; color: var(--dayhue, var(--muted));
-}
-.docday-where:hover { text-decoration: underline; }
-.docday-where .arrow { font-size: 11px; }
-.docday-edge { color: var(--muted); font-size: 11px; }
-.docday-edge::before { content: "\00b7\00a0"; }
-.docday-trip { display: inline-flex; align-items: baseline; gap: 4px; }
-.docday-trip .arrow { color: var(--muted); font-size: 11px; }
-.docday-trip input.bare { width: 110px; font-size: 13px; padding: 0 3px; }
-
-.docday-acts {
-  display: inline-flex; gap: 9px; opacity: 0; transition: opacity .12s ease;
-  font-size: 11px;
-}
-.docday:hover .docday-acts, .docday:focus-within .docday-acts { opacity: 1; }
-.docday.locked .docday-acts { opacity: .8; }
-.docday-acts .linkbtn.on { color: var(--accent-ink); }
-
-/* The day's derived facts, as a sentence rather than a row of badges. */
-.docday-ctx { display: block; margin: 0; color: var(--muted); font-size: 12px; }
-.ctxbit {
-  background: none; border: 0; padding: 0; cursor: pointer;
-  font: inherit; color: inherit; text-align: left;
-}
-.ctxbit + .ctxbit::before { content: "\00a0\00b7\00a0"; }
-.ctxbit:hover { color: var(--accent-ink); text-decoration: underline; }
-.ctxbit.booked { color: var(--good); }
-.ctxbit i { font-style: normal; opacity: .7; }
-.ctxbit i::before { content: " ("; }
-.ctxbit i::after { content: ")"; }
-
-/* The prose. */
-.docnotes {
-  width: 100%; border: 0; background: none; resize: none; overflow: hidden;
-  font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink);
-  padding: 0; margin: 0; display: block; min-height: 1.5em;
-}
-.docnotes::placeholder { color: var(--muted); opacity: 0; transition: opacity .12s ease; }
-.docday:hover .docnotes::placeholder, .docnotes:focus::placeholder { opacity: .55; }
-.docnotes:focus { outline: none; box-shadow: -8px 0 0 var(--accent-soft); }
-.docnotes:disabled { color: var(--ink); opacity: 1; }
-
-.docitem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
-.docitem.done .bare.grow { text-decoration: line-through; color: var(--muted); }
-.docitem input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
-.docitem input.bare { font-size: 13px; padding: 0 3px; }
-.docitem input.bare.grow { flex: 1 1 140px; min-width: 100px; }
-.docitem input.time { flex: 0 0 52px; width: 52px; font-family: var(--mono); font-size: 11.5px; }
-.docitem .amount { flex: 0 0 auto; }
-.docitem .amount input.num { width: 52px; font-size: 11.5px; padding: 0 3px; }
-.docitem .amount .curpick {
-  border-color: transparent; background: none; width: auto;
-  font-size: 10px; padding: 0 2px; color: var(--muted);
-}
-.docitem:hover .amount .curpick { border-color: var(--line-soft); }
-/* Kind, link and delete are machinery, not content. */
-.docitem-more {
-  display: inline-flex; align-items: center; gap: 5px;
-  width: 0; overflow: hidden; opacity: 0; transition: opacity .12s ease;
-}
-.docitem:hover .docitem-more, .docitem:focus-within .docitem-more {
-  width: auto; overflow: visible; opacity: 1;
-}
-.docitem-more .kindpick { font-size: 10px; padding: 1px 3px; }
-.docitem-more input.url { width: 90px; font-size: 11px; }
-
-.docday-add {
-  display: flex; gap: 12px; height: 0; overflow: hidden; opacity: 0;
-  transition: opacity .12s ease; font-size: 11px;
-}
-.docday:hover .docday-add, .docday:focus-within .docday-add {
-  height: auto; opacity: 1; padding-top: 3px;
-}
+.step.done .step-n { background: var(--good); border-color: var(--good); color: var(--card); }
+.step.started .step-n { border-color: var(--accent); color: var(--accent-ink); }
+.step.on.done .step-n { background: var(--on-accent); border-color: var(--on-accent); color: var(--accent); }
+.step.on .step-n { border-color: var(--on-accent); color: var(--on-accent); }
+@media (max-width: 620px) { .step-l { display: none; } .step { min-width: 0; } }
 
 /* --------------------------------------------------------------- banners */
 .banner { font-family: var(--mono); font-size: 12px; line-height: 1.55; padding: 9px 12px; border-radius: 2px; }
@@ -791,9 +641,6 @@ button.tl-day {
 
 /* ================================================================== stays */
 .tbl-scroll { overflow-x: auto; margin-top: 6px; border: 1px solid var(--line-soft); border-radius: 2px; }
-/* Narrow column: let the table keep its shape and scroll, rather than
-   crushing every input until "Palazzo Guadagni" reads as "Pala". */
-.tbl.stays { min-width: 620px; }
 .tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 .tbl th {
   font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
@@ -1108,7 +955,7 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
 
   /* ---- anything you tap is at least a fingertip ---- */
   .btn { min-height: 44px; padding-left: 14px; padding-right: 14px; border-radius: 9px; }
-  .tab, .costbtn, .link, .brand { min-height: 44px; }
+  .step, .costbtn, .link, .brand { min-height: 44px; }
   .link { display: inline-flex; align-items: center; }
 
   /* 16px or iOS zooms the whole page on focus, and never zooms back. */
@@ -1138,8 +985,8 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   }
   .tl { min-width: 620px; }
 
-  /* ---- the tabs become the bottom tab bar ---- */
-  .tabs {
+  /* ---- the stepper becomes the tab bar ---- */
+  .stepper {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
     border: 0; border-top: 1px solid var(--line); border-radius: 0;
     gap: 0; padding: 0 0 env(safe-area-inset-bottom);
@@ -1148,26 +995,16 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
     backdrop-filter: saturate(180%) blur(16px);
     overflow: visible;
   }
-  .tab {
-    flex: 1 1 0; min-width: 0; flex-direction: column; gap: 4px;
-    border-radius: 0; background: none; padding: 8px 2px 6px;
-    font-size: 9.5px; letter-spacing: .04em;
+  .step {
+    flex: 1 1 0; min-width: 0; flex-direction: column; gap: 3px;
+    border-radius: 0; background: none; padding: 7px 2px 6px;
+    font-size: 9px; letter-spacing: .04em;
   }
-  .tab.on { background: none; color: var(--accent-ink); }
-  .tab .dot { width: 9px; height: 9px; }
-  .tab:active { opacity: .5; }
-
-  /* One column, document first — it is the thing you came to read. Tapping a
-     tab scrolls the workbench up to meet you rather than replacing the page. */
-  .desk { gap: 12px; }
-  .desk-work { position: static; max-height: none; overflow: visible; }
-  .doc { border-radius: 12px; padding: 16px 16px 20px; }
-  .docday { padding-left: 10px; margin-left: -10px; }
-  .docday-acts { opacity: 1; }
-  .docday-add { opacity: 1; height: auto; overflow: visible; padding-top: 6px; }
-  .docnotes { font-size: 16px; line-height: 1.6; }
-  .asks { gap: 5px; }
-  .ask { font-size: 12px; padding: 7px 12px; }
+  .step-l { display: block; }          /* the tab bar wants its labels back */
+  .step.on { background: none; color: var(--accent-ink); }
+  .step.on .step-n { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .step-n { width: 22px; height: 22px; }
+  .step:active { opacity: .5; }
 
   /* ---- odds and ends ---- */
   .foot { text-align: center; padding: 4px 0 0; }

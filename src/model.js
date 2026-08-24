@@ -18,18 +18,6 @@ export const PHASES = [
 ];
 export const PHASE_KEYS = PHASES.map((p) => p.key);
 
-/* The workbench tabs. `days` is deliberately absent: the itinerary is the
-   permanent left column now, so there is nowhere to navigate to — the other
-   four are the places where a decision actually gets made. PHASES above is
-   still the progress summary on the trip list, and phaseState still reads it. */
-export const PANELS = [
-  { key: "dates",   label: "Dates" },
-  { key: "flights", label: "Transport" },
-  { key: "cities",  label: "Cities" },
-  { key: "stays",   label: "Stays" },
-];
-export const PANEL_KEYS = PANELS.map((p) => p.key);
-
 export const STAY_STATUSES = ["Shortlist", "Maybe", "Ruled out", "Booked"];
 
 /* Getting between places. Flights come from the Flights phase's chosen option;
@@ -741,82 +729,6 @@ export function openBookings(t) {
     });
   });
   return out.sort((a, b) => a.date.localeCompare(b.date));
-}
-
-/* --------------------------------------------------------- open questions */
-/*
-   What is still undecided, phrased as the decision rather than the chore.
-   Planning a trip is not a pipeline you walk once — you pick a city, that
-   changes the flight, the flight changes the dates, and you go round again.
-   So this deliberately imposes no order: it is the set of things nobody has
-   settled yet, and any of them can be answered at any time.
-
-   `panel` names where the question gets answered, so a question is also a
-   way in. `blocking` marks the ones that make other questions unanswerable
-   rather than merely unanswered — you cannot lay out cities against dates
-   that do not exist.
-
-   Derived, never stored. A question disappears because the trip changed,
-   never because somebody ticked it off.
-*/
-export function openQuestions(t) {
-  const out = [];
-  const ask = (id, text, panel, blocking = false) => out.push({ id, text, panel, blocking });
-  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-  /* -- when -- */
-  if (!t.dates.start || !t.dates.end) {
-    ask("dates", "When are you going?", "dates", true);
-  } else if (!t.dates.locked) {
-    ask("dates-lock", "Are the dates settled?", "dates");
-  }
-
-  /* -- where -- */
-  const total = tripNights(t);
-  const segs = t.segments || [];
-  if (!segs.length) {
-    if (total) ask("cities", "Which cities?", "cities", true);
-  } else {
-    const got = assignedNights(segs);
-    if (total && got !== total) {
-      const d = total - got;
-      ask("nights", d > 0
-        ? `${plural(d, "night", "nights")} not spoken for`
-        : `${plural(-d, "night", "nights")} more than the trip is long`, "cities");
-    }
-    if (segs.some((x) => !x.city.trim())) ask("unnamed", "A stop has no city yet", "cities");
-    const loose = segs.filter((x) => !x.locked).length;
-    if (loose && total && got === total) {
-      ask("cities-lock", `${plural(loose, "city", "cities")} still movable`, "cities");
-    }
-  }
-
-  /* -- getting there, and around -- */
-  const opts = (t.flights.options || []).length;
-  if (!opts && !(t.travel || []).length) {
-    ask("transport", "How do you get there?", "flights", !total ? false : true);
-  } else if (!t.flights.bookedId && opts) {
-    ask("flight", opts === 1 ? "One flight option, none chosen" : `${opts} flight options, none chosen`, "flights");
-  }
-  unplannedMoves(t).forEach((d) => {
-    ask(`move:${d.iso}`, `${d.wake} to ${d.sleep} — no way there yet`, "flights");
-  });
-
-  /* -- beds -- */
-  segmentSpans(t).forEach(({ seg }) => {
-    if (!seg.city.trim() || isTransitStop(t, seg)) return;
-    const mine = (t.stays || []).filter((x) => x.segmentId === seg.id && x.status !== "Ruled out");
-    if (!mine.length) ask(`bed:${seg.id}`, `Where do you sleep in ${seg.city}?`, "stays");
-    else if (!mine.some((x) => x.status === "Booked")) {
-      ask(`bed:${seg.id}`, `${seg.city}: ${plural(mine.length, "place", "places")} in the running`, "stays");
-    }
-  });
-
-  /* -- what the days themselves are still waiting on -- */
-  const unbought = openBookings(t).length;
-  if (unbought) ask("tickets", `${plural(unbought, "thing", "things")} still to book`, "");
-
-  return out;
 }
 
 /* ------------------------------------------------------------ index entry */

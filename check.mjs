@@ -50,14 +50,8 @@ check("writes the v2 layout on first load", JSON.stringify(pub1[0] || []).includ
 console.log("\nopening a trip");
 await p.click(".tripmain");
 await p.waitForTimeout(400);
-check("four workbench tabs, unnumbered", (await p.locator(".tab").count()) === 4);
-check("dates panel is current", (await p.getAttribute(".tab.on", "aria-current")) === "page");
-check("the itinerary is on screen without being navigated to", (await p.locator(".desk-doc .doc").count()) === 1);
-check("the shelf opens on what is actually unsettled, not step 1 of 5",
-  /dates settled/.test(await p.textContent(".asks")), await p.textContent(".asks"));
-check("and a question with nothing behind it yet is marked blocking",
-  (await p.locator(".ask.blocking").first().textContent()).includes("Which cities"),
-  await p.textContent(".asks"));
+check("stepper shows five phases", (await p.locator(".step").count()) === 5);
+check("dates phase is current", (await p.getAttribute(".step.on", "aria-current")) === "step");
 check("header shows the trip name", (await p.textContent(".tripname-btn")) === "Italy");
 
 console.log("\nphase 1 — dates");
@@ -70,19 +64,17 @@ check("counts weekdays to book off", /10 weekday/.test(await p.textContent(".rea
 await p.click("button:has-text('Lock these dates')");
 await p.waitForTimeout(300);
 check("locks the dates", (await p.locator(".chip.st-booked").count()) > 0);
-check("dates tab now reads done", (await p.locator(".tab.is-done").count()) >= 1);
-check("and the shelf stops asking about dates",
-  !/going|dates settled/.test(await p.textContent(".asks")), await p.textContent(".asks"));
+check("dates step now reads done", (await p.locator(".step.done").count()) >= 1);
 
 console.log("\nphase 3 — cities");
-await p.click(".tab:has-text('Cities')");
+await p.click(".step:has-text('Cities')");
 await p.waitForTimeout(300);
 await p.click(".addrow:has-text('Add a stop')");
 await p.waitForTimeout(150);
 await p.fill(".segrow.adding .segcity", "Rome");
 await p.click(".segrow.adding button:has-text('Add stop')");
 await p.waitForTimeout(250);
-check("first city takes the whole trip", /11.*of.*11/s.test((await p.textContent(".desk-work .nightcount")).replace(/\s+/g, " ")), await p.textContent(".desk-work .nightcount"));
+check("first city takes the whole trip", /11.*of.*11/s.test((await p.textContent(".nightcount")).replace(/\s+/g, " ")), await p.textContent(".nightcount"));
 await p.fill(".segrow.adding .segcity", "Florence");
 await p.click(".segrow.adding button:has-text('Add stop')");
 await p.waitForTimeout(250);
@@ -109,7 +101,7 @@ check("drag conserved the total", after.reduce((a, b) => a + b, 0) === 11, after
 
 console.log("\nlocking and reordering cities");
 check("cities step is not done while any city is unlocked",
-  (await p.evaluate(() => document.querySelector(".tab:nth-child(3)").className)).includes("started"));
+  (await p.evaluate(() => document.querySelector(".step:nth-child(3)").className)).includes("started"));
 await p.click(".segrow:first-child button:has-text('Lock')");
 await p.waitForTimeout(200);
 check("a locked city says so", (await p.textContent(".segrow:first-child")).includes("Locked"));
@@ -120,7 +112,7 @@ check("the ribbon drops the handle next to a locked city",
 await p.click(".segrow:nth-child(2) button:has-text('Lock')");
 await p.waitForTimeout(250);
 check("cities step turns done once every city is locked",
-  (await p.evaluate(() => document.querySelector(".tab:nth-child(3)").className)).includes("done"));
+  (await p.evaluate(() => document.querySelector(".step:nth-child(3)").className)).includes("done"));
 const orderBefore = await p.evaluate(() => [...document.querySelectorAll(".segcity")].map((i) => i.value).filter(Boolean));
 await p.focus(".segrow:first-child .drag");
 await p.keyboard.press("ArrowDown");
@@ -135,52 +127,9 @@ await p.waitForTimeout(250);
 
 console.log("\nthe ribbon accumulates");
 const layers = () => p.evaluate(() => [...document.querySelectorAll(".ribbon .tl-row")].map((r) => r.className.split(" ")[1]));
-/* The workbench stacks below the whole itinerary under 900px, and inside the
-   scrolling column the panel is taller than the viewport. Un-pinned, the nav
-   is off screen in both cases - which is exactly how it went missing. */
-const tabBox = () => p.evaluate(() => {
-  const t = document.querySelector(".tabs");
-  const kids = [...t.children].map((c) => Math.round(c.getBoundingClientRect().height));
-  return {
-    h: Math.round(t.getBoundingClientRect().height),
-    position: getComputedStyle(t).position,
-    kids,
-    sameHeight: new Set(kids).size === 1,
-    oneRow: new Set([...t.children].map((c) => Math.round(c.getBoundingClientRect().y))).size === 1,
-  };
-});
-const bar = await tabBox();
-check("the tab bar is an actual bar, not a sliver", bar.h > 28 && bar.h < 52, bar);
-check("every tab is the same height, on one row", bar.sameHeight && bar.oneRow, bar);
-check("the tabs are pinned, so navigation is never scrolled away", bar.position === "sticky", bar);
-check("and pinning holds when the workbench scrolls", await p.evaluate(async () => {
-  const w = document.querySelector(".desk-work");
-  const t = document.querySelector(".tabs");
-  w.scrollTop = 600;
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  return t.getBoundingClientRect().top >= w.getBoundingClientRect().top - 1;
-}));
-await p.evaluate(() => { document.querySelector(".desk-work").scrollTop = 0; });
-await p.setViewportSize({ width: 820, height: 900 });
-await p.waitForTimeout(250);
-const stackedBox = await tabBox();
-check("still pinned, and still a bar, once the columns stack",
-  stackedBox.position === "sticky" && stackedBox.h > 28 && stackedBox.h < 52
-  && stackedBox.sameHeight, stackedBox);
-check("and stacked means one column, document first", await p.evaluate(() => {
-  const d = document.querySelector(".desk-doc"), w = document.querySelector(".desk-work");
-  return d.getBoundingClientRect().bottom <= w.getBoundingClientRect().top + 1;
-}));
-await p.setViewportSize({ width: 1280, height: 1500 });
-await p.waitForTimeout(250);
-check("wide enough, the document takes a third and the workbench two", await p.evaluate(() => {
-  const d = document.querySelector(".desk-doc").getBoundingClientRect().width;
-  const w = document.querySelector(".desk-work").getBoundingClientRect().width;
-  return Math.abs(w / d - 2) < 0.15;
-}));
-check("the tabs sit above the ribbon, both inside the workbench column", await p.evaluate(() => {
-  const t = document.querySelector(".desk-work .tabs"), r = document.querySelector(".desk-work .ribbon");
-  return !!(t && r) && (t.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+check("the ribbon sits above the stepper", await p.evaluate(() => {
+  const r = document.querySelector(".ribbon"), st = document.querySelector(".stepper");
+  return !!(r && st) && (r.compareDocumentPosition(st) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 }));
 check("the calendar names its months", (await p.locator(".ribbon .tl-month").count()) >= 1);
 check("week boundaries are ruled", (await p.locator(".ribbon .tl-weeks .wk").count()) >= 1);
@@ -190,13 +139,13 @@ check("travel is discrete points, one per leg", (await p.locator(".ribbon .point
 check("a leg outside the locked dates is flagged, not dropped",
   (await p.locator(".ribbon .point.off").count()) === 1,
   await p.evaluate(() => [...document.querySelectorAll(".ribbon .point")].map((x) => x.title)));
-await p.click(".tab:has-text('Dates')");
+await p.click(".step:has-text('Dates')");
 await p.waitForTimeout(300);
 check("the ribbon follows to Dates and keeps the city layer", (await layers()).includes("segments"), await layers());
 check("locked dates show as a bar, not a picker", (await p.locator(".ribbon .tl-pick").count()) === 0);
 
 console.log("\nphases 4 and 5");
-await p.click(".tab:has-text('Stays')");
+await p.click(".step:has-text('Stays')");
 await p.waitForTimeout(300);
 check("one stays card per city", (await p.locator(".card").count()) >= 2);
 // The add button is per-card and no longer names its city, so scope by card.
@@ -208,19 +157,16 @@ await p.waitForTimeout(200);
 const perNight = await p.textContent(".tbl.stays tbody tr:first-child td:nth-child(3)");
 check("per-night is derived from the segment's nights", perNight.replace(/\D/g, "") === String(Math.round(1200 / after[0])), { perNight, romeNights: after[0] });
 
-check("one section per trip day, no navigation needed", (await p.locator(".docday").count()) === 12);
-check("day sections know their city", /Rome/.test(await p.textContent(".docday:first-of-type")), await p.textContent(".docday:first-of-type"));
-check("nothing in the document is collapsed", (await p.locator(".docday .docnotes").count()) === 12);
-await p.hover(".docday:first-of-type");
-await p.click(".docday:first-of-type button:has-text('+ add')");
+await p.click(".step:has-text('Days')");
+await p.waitForTimeout(300);
+check("one row per trip day", (await p.locator(".day").count()) === 12);
+check("day rows know their city", /Rome/.test(await p.textContent(".day:first-child")), await p.textContent(".day:first-child"));
+check("every day is expanded by default", (await p.locator(".day.open").count()) === 12);
+await p.click(".day:first-child button:has-text('+ ticket')");
 await p.waitForTimeout(200);
-await p.fill(".docday:first-of-type .docitem input.bare.grow", "Colosseum");
-// Adding does not ask what kind it is; the row's own dropdown decides that.
-await p.selectOption(".docday:first-of-type .docitem .kindpick", "ticket");
-await p.waitForTimeout(350);
-check("an unbought ticket surfaces on the shelf",
-  /1 thing still to book/.test(await p.textContent(".asks")), await p.textContent(".asks"));
-check("and it is stated, not offered as a link", (await p.locator(".ask.flat").count()) === 1);
+await p.fill(".day:first-child .item input.bare.grow", "Colosseum");
+await p.waitForTimeout(200);
+check("an unbought ticket surfaces in 'still to book'", /Colosseum/.test(await p.textContent(".todo")), await p.textContent(".todo").catch(() => "no todo"));
 await p.waitForTimeout(300);
 const finalLayers = await layers();
 check("by the last phase the ribbon carries every layer, hotels above cities",
@@ -229,12 +175,12 @@ check("every day is ruled, not just weeks", (await p.locator(".ribbon .tl-weeks 
 check("the days layer marks the day with an item", (await p.locator(".ribbon .tick").count()) >= 1);
 
 console.log("\nday trips");
-await p.click(".docday:first-of-type button:has-text('day trip')");
+await p.click(".day:first-child button:has-text('+ day trip')");
 await p.waitForTimeout(150);
-await p.fill(".docday:first-of-type .docday-trip input", "Pompeii");
+await p.fill(".day:first-child .daytrip-edit input", "Pompeii");
 await p.waitForTimeout(400);
-check("the day still names the city you sleep in", (await p.textContent(".docday:first-of-type .docday-where")).includes("Rome"));
-check("the day trip reads beside it", (await p.inputValue(".docday:first-of-type .docday-trip input")) === "Pompeii");
+check("the day still names the city you sleep in", (await p.textContent(".day:first-child .day-city")).includes("Rome"));
+check("the day trip reads beside it", (await p.inputValue(".day:first-child .daytrip-edit input")) === "Pompeii");
 check("the ribbon marks the day trip differently", (await p.locator(".ribbon .tick.daytrip").count()) === 1);
 const sleeping = await p.evaluate(() => {
   const row = [...document.querySelectorAll(".ribbon .tl-row")]
@@ -245,15 +191,16 @@ check("the hotels layer still reads City — Hotel, untouched by the day trip",
   !!sleeping && sleeping.includes("Rome") && sleeping.includes("Hotel Artemide"), sleeping);
 
 console.log("\nlocking days");
-check("the document counts what is locked", (await p.textContent(".doc-top")).replace(/\s+/g, " ").includes("0 of 12"));
-await p.click(".doc-top button:has-text('Lock all')");
+check("days step is not done with one day filled in",
+  (await p.evaluate(() => document.querySelector(".step:nth-child(5)").className)).includes("started"));
+await p.click(".toolbar button:has-text('Lock all')");
 await p.waitForTimeout(400);
-check("locking every day takes one control, not twelve",
-  (await p.textContent(".doc-top")).replace(/\s+/g, " ").includes("12 of 12"));
-check("and each day says it is locked", (await p.locator(".docday.locked").count()) === 12);
+check("days step turns done once every day is locked",
+  (await p.evaluate(() => document.querySelector(".step:nth-child(5)").className)).includes("done"));
+check("the counter agrees", (await p.textContent(".nightcount")).replace(/\s+/g, " ").includes("12 of 12"));
 
 console.log("\nthe day trip shows in Cities");
-await p.click(".tab:has-text('Cities')");
+await p.click(".step:has-text('Cities')");
 await p.waitForTimeout(350);
 check("a day-trip row appears in the list", (await p.locator(".segrow.triprow").count()) === 1);
 check("it names the stop it is out of", (await p.textContent(".segrow.triprow")).includes("out of Rome"));
@@ -273,19 +220,21 @@ const halves = await p.evaluate(() => {
 check("each day is two half-columns wide", halves.cols === halves.heads * 2 + 1, halves);
 check("a stop starts at midday, not at the day boundary",
   halves.segs.every((v) => (parseInt(v, 10) - 2) % 2 === 1), halves);
+await p.click(".step:has-text('Days')");
+await p.waitForTimeout(350);
 const travelRow = await p.evaluate(() => {
-  const r = [...document.querySelectorAll(".docday")].find((x) => x.className.includes("moving"));
-  return r ? r.querySelector(".docday-head").textContent.replace(/\s+/g, " ") : null;
+  const r = [...document.querySelectorAll(".day")].find((x) => x.className.includes("travel"));
+  return r ? r.querySelector(".day-head").textContent.replace(/\s+/g, " ") : null;
 });
 check("the travel day names both cities", !!travelRow && /Rome.*Florence/.test(travelRow), travelRow);
-// The document is navigation too: a day's city opens the panel that owns it.
-await p.click(".tab:has-text('Stays')");
-await p.waitForTimeout(250);
-await p.click(".docday:first-of-type .docday-where");
-await p.waitForTimeout(350);
-check("clicking a day's city opens Cities",
-  /cities/i.test(await p.textContent(".tab.on")), await p.textContent(".tab.on"));
+check("and labels it a travel day", !!travelRow && /travel day/.test(travelRow), travelRow);
+const wasOpen = await p.evaluate(() => document.querySelector(".day").classList.contains("open"));
+await p.click(".day:first-child .day-date");
 await p.waitForTimeout(200);
+check("clicking the row toggles it",
+  (await p.evaluate(() => document.querySelector(".day").classList.contains("open"))) !== wasOpen);
+await p.click(".step:has-text('Cities')");
+await p.waitForTimeout(300);
 
 console.log("\nclicking the calendar");
 await p.click(".ribbon .point >> nth=0");
@@ -391,7 +340,7 @@ await p2.waitForTimeout(900);
 check("reboot finds the trip", (await p2.locator(".tripcard").count()) === 1);
 check("reboot shows all five phase dots progressed", (await p2.locator(".phasedots .dot.is-done, .phasedots .dot.is-started").count()) >= 4);
 await p2.click(".tripmain");
-await p2.click(".tab:has-text('Cities')");
+await p2.click(".step:has-text('Cities')");
 await p2.waitForTimeout(400);
 check("reboot restores the dragged nights", (await p2.evaluate(() => [...document.querySelectorAll(".segnights .num")].map((x) => x.textContent))).join(",") === after.map((n) => n + "n").join(","));
 

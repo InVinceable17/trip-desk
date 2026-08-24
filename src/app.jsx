@@ -3,8 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { label as dayLabel } from "./flights.js";
 import {
-  PANELS, PANEL_KEYS, blankTrip, hydrateTrip, phaseState, tripCost, tripNights,
-  openQuestions, fmtMoney,
+  PHASES, PHASE_KEYS, blankTrip, hydrateTrip, phaseState, tripCost, tripNights, indexEntry, fmtMoney,
 } from "./model.js";
 import { loadAll, makeSaver, MODE, auth, describeAuthError, describeLoadError, HOSTED } from "./store.js";
 import * as backend from "./backend.js";
@@ -17,12 +16,12 @@ import Dates from "./views/Dates.jsx";
 import Flights from "./views/Flights.jsx";
 import Cities from "./views/Cities.jsx";
 import Stays from "./views/Stays.jsx";
-import Itinerary from "./views/Itinerary.jsx";
+import Days from "./views/Days.jsx";
 import Backup from "./views/Backup.jsx";
 import SignIn from "./views/SignIn.jsx";
 import { SourceBar } from "./views/Source.jsx";
 
-const VIEWS = { dates: Dates, flights: Flights, cities: Cities, stays: Stays };
+const VIEWS = { dates: Dates, flights: Flights, cities: Cities, stays: Stays, days: Days };
 
 /* ------------------------------------------------------------------ route */
 
@@ -30,9 +29,7 @@ function parseHash() {
   if (/^#\/backup/.test(location.hash || "")) return { view: "backup" };
   const m = /^#\/t\/([^/]+)(?:\/([^/]+))?/.exec(location.hash || "");
   if (!m) return { view: "trips" };
-  /* `days` was its own phase before the itinerary became the permanent left
-     column; old links still resolve, they just land on the first panel. */
-  return { view: "trip", id: m[1], panel: PANEL_KEYS.includes(m[2]) ? m[2] : "dates" };
+  return { view: "trip", id: m[1], phase: PHASE_KEYS.includes(m[2]) ? m[2] : "dates" };
 }
 
 function useRoute() {
@@ -199,7 +196,7 @@ function App() {
       )}
 
       {note && <div className="banner warn">{note}</div>}
-      {!HOSTED && mcp === null && route.view === "trip" && route.panel === "flights" && (
+      {!HOSTED && mcp === null && route.view === "trip" && route.phase === "flights" && (
         <div className="banner warn">
           Price checks are off — no Browserless connector. Fare links still open Google Flights.
         </div>
@@ -226,37 +223,24 @@ function App() {
 
       {route.view === "trip" && trip && (
         <>
-          <Questions trip={trip} onGo={(p) => go(`#/t/${trip.id}/${p}`)} />
-
-          {/* Two columns: the trip as written on the left, the place you work
-              it out on the right. The document is never navigated away from,
-              so there is always an answer on screen to "what is this trip". */}
-          <div className="desk">
-            <div className="desk-doc">
-              <Itinerary
-                trip={trip} readOnly={readOnly}
-                update={(fn) => updateTrip(trip.id, fn)}
-                onGo={(p) => go(`#/t/${trip.id}/${p}`)}
-              />
-            </div>
-
-            <div className="desk-work">
-              <Tabs trip={trip} panel={route.panel} onGo={(p) => go(`#/t/${trip.id}/${p}`)} />
-              <SourceBar
-                trip={trip} readOnly={readOnly} who={who}
-                update={(fn) => updateTrip(trip.id, fn)}
-              />
-              <TripTimeline
-                trip={trip} phase={route.panel} readOnly={readOnly}
-                update={(fn) => updateTrip(trip.id, fn)}
-              />
-              <PanelView
-                key={`${trip.id}:${route.panel}`}
-                panel={route.panel} trip={trip} mcp={mcp} readOnly={readOnly}
-                update={(fn) => updateTrip(trip.id, fn)}
-              />
-            </div>
-          </div>
+          {/* The calendar is the fixed reference; the chapters below it change.
+              It sits above the stepper so edits in a section can be judged
+              against it before they are locked in. */}
+          {/* Where these plans came from, before the plans themselves. */}
+          <SourceBar
+            trip={trip} readOnly={readOnly} who={who}
+            update={(fn) => updateTrip(trip.id, fn)}
+          />
+          <TripTimeline
+            trip={trip} phase={route.phase} readOnly={readOnly}
+            update={(fn) => updateTrip(trip.id, fn)}
+          />
+          <Stepper trip={trip} phase={route.phase} onGo={(p) => go(`#/t/${trip.id}/${p}`)} />
+          <PhaseView
+            key={`${trip.id}:${route.phase}`}
+            phase={route.phase} trip={trip} mcp={mcp} readOnly={readOnly}
+            update={(fn) => updateTrip(trip.id, fn)}
+          />
         </>
       )}
 
@@ -269,8 +253,8 @@ function App() {
   );
 }
 
-function PanelView({ panel, ...props }) {
-  const V = VIEWS[panel] || Dates;
+function PhaseView({ phase, ...props }) {
+  const V = VIEWS[phase] || Dates;
   return <V {...props} />;
 }
 
@@ -342,61 +326,27 @@ function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, readOn
   );
 }
 
-/* ------------------------------------------------------------------- tabs */
-/* Deliberately not numbered. A stepper says "you are on 3 of 5 and behind";
-   these are four places to work, in no order, any of which you may be in the
-   middle of. The dot carries the same phaseState the trip list uses, so
-   progress is still legible without implying a route through it. */
+/* ---------------------------------------------------------------- stepper */
 
-function Tabs({ trip, panel, onGo }) {
-  /* Stacked into one column, the workbench sits under the itinerary. A tab is
-     a request to work on something, so bring the work up to meet the thumb. */
-  const reach = () => {
-    if (matchMedia("(min-width: 1080px)").matches) return;
-    const el = document.querySelector(".desk-work");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
+function Stepper({ trip, phase, onGo }) {
   return (
-    <nav className="tabs" aria-label="Planning">
-      {PANELS.map((p) => {
+    <nav className="stepper" aria-label="Planning phases">
+      {PHASES.map((p) => {
         const st = phaseState(trip, p.key);
-        const on = p.key === panel;
-        // `is-` prefixed: phaseState returns "empty", and a bare `empty` class
-        // collides with the global empty-state rule (padding: 22px 0).
+        const on = p.key === phase;
         return (
-          <button key={p.key} className={`tab is-${st}${on ? " on" : ""}`}
-            aria-current={on ? "page" : undefined}
-            onClick={() => { onGo(p.key); reach(); }}>
-            <i className={`dot is-${st}`} aria-hidden="true" />
-            {p.label}
+          <button
+            key={p.key}
+            className={`step ${st}${on ? " on" : ""}`}
+            aria-current={on ? "step" : undefined}
+            onClick={() => onGo(p.key)}
+          >
+            <span className="step-n">{st === "done" ? "✓" : p.n}</span>
+            <span className="step-l">{p.label}</span>
           </button>
         );
       })}
     </nav>
-  );
-}
-
-/* -------------------------------------------------------- open questions */
-/* What nobody has decided yet, phrased as the decision. This is the guidance
-   the stepper only pretended to give: it says what is actually unsettled
-   rather than which numbered box you are standing in, and each one is a way
-   into the panel that settles it. Empty means the trip is planned. */
-
-function Questions({ trip, onGo }) {
-  const qs = openQuestions(trip);
-  if (!qs.length) return null;
-  return (
-    <div className="asks">
-      {qs.map((q) => (
-        q.panel
-          ? (
-            <button key={q.id} className={`ask${q.blocking ? " blocking" : ""}`}
-              onClick={() => onGo(q.panel)}>{q.text}</button>
-          )
-          : <span key={q.id} className="ask flat">{q.text}</span>
-      ))}
-    </div>
   );
 }
 

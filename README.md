@@ -50,9 +50,8 @@ Publish `dist/artifact.html` with the Artifact tool, declaring:
 | `src/store-artifact.js` | Backend: `data/index.json` + `data/trips/<id>.json` inside the artifact. |
 | `src/store-firebase.js` | Backend: Firestore, Google sign-in, offline cache, cross-device listener. |
 | `src/backend.js` | The swap point. `build-web.mjs` resolves it to the Firestore adapter. |
-| `src/app.jsx` | Shell — hash router, header, the two-column desk, tabs, the open-questions shelf. |
-| `src/views/Itinerary.jsx` | The left column: the whole trip as one editable document. |
-| `src/views/*.jsx` | One per workbench panel, plus `Trips.jsx` for the landing browser. |
+| `src/app.jsx` | Shell — hash router, header, phase stepper. |
+| `src/views/*.jsx` | One per phase, plus `Trips.jsx` for the landing browser. |
 | `src/components/Timeline.jsx` | The rail primitive: a day header plus a stack of layer rows. |
 | `src/components/TripTimeline.jsx` | Decides which layers a trip has, and which one is live. |
 | `src/page.html` | Body markup, the token palette, and the `/*__BUNDLE__*/` marker. |
@@ -63,49 +62,11 @@ Publish `dist/artifact.html` with the Artifact tool, declaring:
 | `firestore.rules` | Who may read and write. The config in the page is public; **this** is the lock. |
 | `shots.mjs` | Screenshots of every view, both themes, plus a narrow width. |
 
-## The desk
-
-Two columns, a third and two thirds. **Left** is the itinerary: every day of the
-trip, top to bottom, always on screen. It is never navigated away from, so there
-is always an answer to "what is this trip" without clicking anything. **Right**
-is the workbench — Dates, Transport, Cities, Stays — plus the ribbon above it.
-Under 900px the two stack, document first; under 768px the tabs become the
-bottom bar. The tabs are `position: sticky` in every layout, because in both the
-stacked and the scrolling case an un-pinned nav ends up off screen.
-
-The document is a **notepad**: one continuous page of text, no rules between
-days, no chips, no card edges, nothing to expand. Anything you can operate —
-the add row, the kind dropdown, the link field, lock — stays invisible until
-the pointer is on the day it belongs to, so at rest the column reads rather
-than presents.
-
-The document *reads* like a word processor and is edited in place, but it is not
-a text buffer: every keystroke lands in a typed field. Parsing prose back into
-structure happens in exactly one place, the Source panel, where it has an
-`unparsed` list and a drift table to be honest with. See the header comment in
-`views/Itinerary.jsx`.
-
-Structure inside the document — the city, the bed, the trains — is derived and
-read-only there. Clicking any of it opens the panel that owns it, so the
-document doubles as navigation.
-
-### The shelf
-
-Across the top sits `openQuestions(trip)`: what nobody has settled yet, phrased
-as the decision rather than the chore, each one a way into the panel that
-answers it. It replaced a numbered 1–5 stepper, which implied an order that
-planning a trip does not have — you pick a city, that changes the flight, the
-flight changes the dates, round again. Nothing on the shelf is ticked off; an
-entry leaves because the trip changed. `blocking` marks the questions that make
-other questions unanswerable, not merely unanswered.
-
-`PHASES` and `phaseState` both survive: the trip list still shows five progress
-dots, and each tab still carries its own state dot.
-
 ## The ribbon
 
-The timeline sits at the top of the workbench column and gains a layer as each
-phase produces
+One timeline sits at the very top — above the phase stepper, not below it — so a
+change made in a section can be judged against the calendar before it is locked
+in. It and gains a layer as each phase produces
 something — trip span, flights, cities, stays, then ticks on the days that have
 anything on them. The layer belonging to the phase you are on is the interactive
 one (picking dates, dragging city boundaries); the rest are context.
@@ -144,7 +105,7 @@ boundaries (Sunday starts a week). The rules are one absolutely-positioned grid
 behind the layers rather than a border on each row, so adding a layer never
 disturbs them.
 
-## The four panels, and the days
+## The five phases
 
 1. **Dates** — a soft window in, locked start/end out. `dates.start/end` are the
    working values, edited by clicking the ribbon; `dates.locked` is the
@@ -169,11 +130,8 @@ disturbs them.
 4. **Stays** — candidate places per city segment, dates derived from the segment,
    with Google Maps links for hotels in that city. Plain on purpose, until using
    it shows what it should be.
-5. **Days** — no longer a panel. The itinerary document *is* the days: one
-   section each with its derived city, free notes and items, always expanded.
-   Undone tickets and reservations are counted on the shelf instead of gathering
-   into a second list. Adding an item does not ask what kind it is — the row's
-   own dropdown decides that.
+5. **Days** — one row per day with its derived city, free notes, and items. Undone
+   tickets and reservations gather into a "still to book" list at the top.
 
 ## Money
 

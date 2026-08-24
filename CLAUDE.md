@@ -30,55 +30,6 @@ build was unconfigured, and went stale the day the project got a config — a
 failure nobody saw, because a hardcoded Linux browser path meant the suite had
 never run here at all.
 
-## Two columns, and what the left one is not
-
-The left column is the whole trip as one editable document (`views/Itinerary.jsx`);
-the right is the workbench (Dates, Transport, Cities, Stays) with the ribbon
-above it. The document is never navigated away from.
-
-**The document is not a text buffer.** It reads and edits like a word processor,
-but every keystroke lands in a typed field — `days[iso].notes`, an item title, a
-day-trip city. Making it a real buffer that parses back into structure would
-re-run the lossy prose→structure problem on every keystroke and destabilise the
-ids that keep a renamed hotel distinguishable from a replaced one. That is what
-`doc-parse.js`/`doc-sync.js` already pay for, and the Source panel is the only
-place it belongs.
-
-**`openQuestions()` replaced the numbered stepper.** It is derived, never
-stored, and it must stay that way: an entry leaves because the trip changed, not
-because somebody ticked it. A shelf that never empties is decoration, so
-`test.mjs` asserts a fully-decided trip returns `[]`.
-
-**Never give a component a state class that is also a global class name.**
-`phaseState` returns `"empty"`, and the tab bar rendered it as
-`class="tab empty"` — inheriting `.empty { padding: 22px 0 }`, the global
-empty-state rule. The two untouched tabs came out double height and the bar
-grew with them. State classes are `is-` prefixed for exactly this reason.
-
-**Assert the box, not the declaration.** The first version of the tab test
-checked `getComputedStyle(.tabs).position === "sticky"`. It passed while the
-bar rendered six pixels tall, and passed again when two of four tabs were
-twice the height of the others. `check.mjs` now measures height, per-tab
-height, and single-row layout — and that version fails when the collision is
-put back.
-
-**A scrolling flex column shrinks its children instead of scrolling.**
-`.desk-work` has `max-height` plus `overflow-y: auto`; its children default to
-`flex-shrink: 1`, and `.tabs` sets `overflow-x`, which zeroes its automatic
-minimum size. The navigation was the first thing crushed. `.desk-work > *`
-is `flex: 0 0 auto`.
-
-**The tabs must stay pinned.** They went missing once already: under 900px
-the columns stack and the workbench sits below the *entire* itinerary, and
-inside the sticky column the panel is taller than the viewport. Un-pinned, the
-nav is off screen in both cases. `.tabs` is `position: sticky` in every layout
-and `check.mjs` asserts it at two widths.
-
-**A control hidden behind `:hover` still needs height on touch.** The per-day
-add row is `height: 0` until hover; the phone breakpoint has to restore both
-`height` and `opacity`, and `check.mjs` has to `hover()` before it clicks. Only
-setting `opacity` leaves a zero-height button the page swallows clicks for.
-
 ## The doc behind a trip
 
 A trip can be a structured view of a Google Doc somebody else actually writes
@@ -110,9 +61,8 @@ stale one. This is deliberate — see the comment above `key()` in `doc-sync.js`
 
 Below 768px `page.html` restyles the app: system font for prose, mono kept for
 codes and money, 44px targets, 16px inputs (anything smaller makes iOS zoom on
-focus and never zoom back), and the workbench tabs fixed to the bottom as a tab
-bar. Above 1080px the app is two columns; below that the two stack, itinerary
-first, and a tab tap scrolls the workbench up to meet the thumb. The
+focus and never zoom back), and the phase stepper fixed to the bottom as a tab
+bar. Above that breakpoint nothing changed — the Gantt desk is untouched. The
 `:has()` rule that stands the wordmark down when a trip is open has an
 `@supports not` fallback.
 
@@ -189,5 +139,11 @@ To check the key's restrictions without the console, POST to
 **Adding a traveller** is a rules change only: they sign in once so their UID
 exists, add it to `members()` in `firestore.rules`, publish. No redeploy.
 
-**The service worker caches the app shell**, so a rebuild reaches people only
-after two reloads — one to fetch the new shell, one to run it.
+**The service worker caches the app shell.** Its install fetches with
+`cache: "reload"` on purpose: GitHub Pages serves the shell with
+`max-age=600`, and `addAll` goes through the HTTP cache like any other fetch,
+so without it a *freshly named* cache could be filled from a ten-minute-old
+copy — the worker updates, the cache key changes, and the app you get is
+still the previous deploy. The navigation revalidation passes
+`cache: "no-cache"` for the same reason. Take either off and a deploy stops
+being visible without a hard refresh.
