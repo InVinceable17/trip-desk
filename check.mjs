@@ -178,17 +178,24 @@ check("a day item is one click from the map, in the city that day is in",
   !!itemPin && /\/maps\/search\//.test(itemPin)
   && /Colosseum/.test(decodeURIComponent(itemPin)) && /Rome/.test(decodeURIComponent(itemPin)), itemPin);
 
-/* Two stops make a walk. One does not — the pin already says where it is. */
-check("one stop is not a route", (await p.locator(".day:first-child .day-head a[href*='/maps/dir/']").count()) === 0);
+/* And one click to how you get there from that city's hotel. Two points only:
+   the bed and the thing. Nothing strings the day's stops together. */
+const itemRouteHref = await p.getAttribute(".day:first-child .item a[href*='/maps/dir/']", "href").catch(() => null);
+check("and one click to how you get there from the hotel",
+  !!itemRouteHref && /origin=Hotel%20Artemide/.test(itemRouteHref)
+  && /Colosseum/.test(decodeURIComponent(itemRouteHref))
+  && /travelmode=walking/.test(itemRouteHref), itemRouteHref);
 await p.click(".day:first-child button:has-text('+ idea')");
 await p.waitForTimeout(150);
 await p.locator(".day:first-child .item input.bare.grow").nth(1).fill("Borghese Gallery");
 await p.waitForTimeout(300);
-const dayRouteHref = await p.getAttribute(".day:first-child .day-head a[href*='/maps/dir/']", "href").catch(() => null);
-check("a second stop turns the day into a walking route through both",
-  !!dayRouteHref && /travelmode=walking/.test(dayRouteHref)
-  && /Colosseum/.test(decodeURIComponent(dayRouteHref))
-  && /Borghese Gallery/.test(decodeURIComponent(dayRouteHref)), dayRouteHref);
+check("a second thing gets its own route from the same hotel, not a chain", await p.evaluate(() => {
+  const day = document.querySelector(".day");
+  const hrefs = [...day.querySelectorAll(".item a[href*='/maps/dir/']")].map((a) => a.href);
+  return hrefs.length === 2
+    && hrefs.every((h) => /origin=Hotel%20Artemide/.test(h) && !/waypoints/.test(h))
+    && day.querySelectorAll(".day-head a[href*='/maps/dir/']").length === 0;
+}));
 await p.waitForTimeout(300);
 const finalLayers = await layers();
 check("by the last phase the ribbon carries every layer, hotels above cities",
@@ -242,16 +249,14 @@ check("and the pin points at what the line names", await p.evaluate(() => {
   const a = line && line.querySelector("a.pin");
   return !!a && /\/maps\/search\//.test(a.href) && /Colosseum/.test(decodeURIComponent(a.href));
 }));
-check("a day with two stops carries its walk on the heading", await p.evaluate(() => {
-  const under = (h) => {
-    let n = h.nextElementSibling, txt = "";
-    while (n && n.classList.contains("sd-b")) { txt += n.textContent; n = n.nextElementSibling; }
-    return txt;
-  };
-  const h = [...document.querySelectorAll(".docdrawer .sd-day")].find((x) => /Colosseum/.test(under(x)));
-  const a = h && h.querySelector("a.sd-walk");
-  return !!a && /maps\/dir\/\?api=1/.test(a.href) && /travelmode=walking/.test(a.href);
+check("and the same line carries the way to it from the hotel", await p.evaluate(() => {
+  const line = [...document.querySelectorAll(".docdrawer .sd-b")]
+    .find((b) => /Colosseum/.test(b.textContent));
+  const a = line && line.querySelector("a.sd-from");
+  return !!a && /maps\/dir\/\?api=1/.test(a.href) && /origin=Hotel%20Artemide/.test(a.href);
 }));
+check("no route hangs off a day heading",
+  (await p.locator(".docdrawer .sd-day a").count()) === 0);
 check("but the document's own text has no map links in it — that is what pastes back",
   !/google\.com\/maps/.test(await p.textContent(".docdrawer .sheet-doc")));
 

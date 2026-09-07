@@ -29,14 +29,15 @@
    string, and the view renders the former while the clipboard takes the
    latter — one description, two outputs, so they cannot drift.
 
-   A bullet may also carry a `map`: the Google Maps link for whatever that line
-   names. It is a property of the block and not of its text, which is the whole
-   point — the drawer hangs a pin off the line, and `text()` never serialises
-   it. A map link is derived from the trip, not written by anyone, so pasting
-   one into her doc would be the app writing its own working into her document;
-   and the parser reading it back would take the maps URL for the line's link
-   and "[map]" for part of its title. The document says where you are going.
-   The pin is how you read it.
+   A bullet may also carry a `map` — the Google Maps link for whatever that
+   line names — and a day's own item may carry a `route`, which is the way to
+   it from that day's hotel. Both are properties of the block and not of its
+   text, which is the whole point: the drawer hangs them off the line, and
+   `text()` never serialises either. They are derived from the trip, not
+   written by anyone, so pasting them into her doc would be the app writing its
+   own working into her document; and the parser reading it back would take the
+   maps URL for the line's link and "[map]" for part of its title. The document
+   says where you are going. The links are how you read it.
    ========================================================================== */
 
 import { dayOf, toUTC, fromUTC, range, ISO } from "./flights.js";
@@ -44,7 +45,7 @@ import {
   tripDays, segmentSpans, cityForDay, dayStay, travelOn, travelLegs, leadStay,
   nightsBetween, fmtMoney,
 } from "./model.js";
-import { mapsSearch, itemUrl, stayUrl, legPlaceUrl, dayRoute } from "./maps.js";
+import { mapsSearch, itemUrl, itemRoute, stayUrl, legPlaceUrl, dayBase } from "./maps.js";
 
 /* Her abbreviations, not the standard ones: TUES and THUR, not TUE and THU.
    Matching the doc matters more than matching a convention. */
@@ -227,7 +228,9 @@ function itemLines(trip, iso, day) {
       const line = bits.join(" ");
       /* The doc writes money with its symbol — "($73)", not "(73)". */
       const text = it.cost ? `${line} (${fmtMoney(it.cost, it.currency)})` : line;
-      return { text, map: itemUrl(trip, iso, it) };
+      const r = itemRoute(trip, iso, it);
+      /* `iso` rides along so the view can name the hotel the route starts at. */
+      return { text, iso, map: itemUrl(trip, iso, it), route: r ? r.url : "" };
     });
 }
 
@@ -235,11 +238,12 @@ function itemLines(trip, iso, day) {
 
 /**
  * The itinerary as a list of blocks. `kind` is "title" | "range" | "day" |
- * "bullet"; bullets carry a `depth` of 0 or 1, and anything that is somewhere
- * carries a `map`. The view renders these; text() serialises them. Deriving
- * both from one description is the point — a preview that disagrees with what
- * you paste is worse than no preview — and `map` is the one field the text
- * side deliberately drops, because it is not something the doc says.
+ * "bullet"; bullets carry a `depth` of 0 or 1, anything that is somewhere
+ * carries a `map`, and a day's item also carries the `route` to it from that
+ * day's hotel. The view renders these; text() serialises them. Deriving both
+ * from one description is the point — a preview that disagrees with what you
+ * paste is worse than no preview — and those two link fields are what the text
+ * side deliberately drops, because they are not something the doc says.
  */
 export function blocks(trip) {
   const days = docDays(trip);
@@ -262,10 +266,7 @@ export function blocks(trip) {
   }
 
   days.forEach((iso, i) => {
-    /* The heading carries the day's walk, when the day has one — the one link
-       on the page that is about the day rather than about a line of it. */
-    const walk = dayRoute(trip, iso);
-    out.push({ kind: "day", text: `DAY ${i + 1} - ${headDay(iso)}`, iso, map: walk ? walk.url : "" });
+    out.push({ kind: "day", text: `DAY ${i + 1} - ${headDay(iso)}`, iso });
 
     const day = (trip.days || {})[iso] || {};
     const noteLines = (day.notes || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
@@ -295,8 +296,9 @@ export function blocks(trip) {
  * doc's own: one blank line before DAY 1, two between days, and one under a
  * heading only when something actually follows it.
  *
- * Only `text` is read here. A block's `map` is the app's own working, not a
- * line of her document, and this is what pastes over the top of it.
+ * Only `text` is read here. A block's `map` and `route` are the app's own
+ * working, not lines of her document, and this is what pastes over the top
+ * of it.
  */
 export function text(trip) {
   const bs = blocks(trip);
@@ -355,5 +357,11 @@ export function blankDays(trip) {
     return true;
   });
 }
+
+/** The hotel a day's directions start from, for the link's own label. */
+export const routeFrom = (trip, iso) => {
+  const base = dayBase(trip, iso);
+  return base ? base.stay.name || base.seg.city : "";
+};
 
 export const _internals = { headDay, longDay, spanPhrase, to12h, toUTC };

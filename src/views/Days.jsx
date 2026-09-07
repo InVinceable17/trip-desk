@@ -4,7 +4,7 @@ import {
   tripDays, cityForDay, blankItem, blankDay, ITEM_KINDS, openBookings,
   segmentSpans, lockedDayCount, dayStay, travelOn, KIND_GLYPH, fmtMoney,
 } from "../model.js";
-import { mapsSearch, itemUrl, dayRoute } from "../maps.js";
+import { mapsSearch, itemUrl, itemRoute, dayBase } from "../maps.js";
 import { Btn, Card, Amount } from "../components/ui.jsx";
 
 /* Phase 5. Every day open by default and notes that grow as you type, so the
@@ -32,13 +32,20 @@ function Notes({ value, onChange, disabled, placeholder }) {
   );
 }
 
-/* One tap to the place. The pin is a link and not a button on purpose: it
-   opens Maps in its own tab, and on a phone that is the Maps app. */
+/* One tap to the place, and one to how you get there from the hotel. Links
+   and not buttons on purpose: they open Maps in their own tab, and on a phone
+   that is the Maps app. */
 const ItemPin = ({ url, title }) => (url ? (
   <a className="pin" href={url} target="_blank" rel="noreferrer"
     title={`${title || "This"} in Google Maps`} aria-label={`Open ${title || "this"} in Google Maps`}>
     <span aria-hidden="true">📍</span>
   </a>
+) : null);
+
+const ItemRoute = ({ route, from, title }) => (route ? (
+  <a className="tiny" href={route.url} target="_blank" rel="noreferrer"
+    title={`Directions from ${from} to ${title || "this"}`}
+    aria-label={`Directions from ${from} to ${title || "this"}`}>from hotel ↗</a>
 ) : null);
 
 export default function Days({ trip, update, readOnly }) {
@@ -120,7 +127,9 @@ export default function Days({ trip, update, readOnly }) {
           const last = i === days.length - 1;
           const editing = tripOpen.has(iso) || !!d.city;
           const locked = !!d.locked;
-          const route = dayRoute(trip, iso);
+          /* The hotel this day sets out from, named once here so every item
+             below can say where its directions start. */
+          const base = dayBase(trip, iso);
 
           return (
             <section key={iso} className={`day${open ? " open" : ""}${locked ? " locked" : ""}${st.moves ? " travel" : ""}`}
@@ -186,10 +195,6 @@ export default function Days({ trip, update, readOnly }) {
                 {last && <span className="chip">depart</span>}
 
                 <div className="grow" />
-                {route && (
-                  <a className="tiny nostretch" href={route.url} target="_blank" rel="noreferrer"
-                    title={`Walk the day in Google Maps — ${route.stops.join(" → ")}`}>route ↗</a>
-                )}
                 {where && where.city && (
                   <a className="tiny nostretch" href={mapsSearch(`things to do in ${where.city}`)} target="_blank" rel="noreferrer">maps ↗</a>
                 )}
@@ -228,6 +233,8 @@ export default function Days({ trip, update, readOnly }) {
                       <input className="bare url" value={it.url} disabled={readOnly || locked} placeholder="link"
                         onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, url: e.target.value } : y)) }))} />
                       <ItemPin url={itemUrl(trip, iso, it)} title={it.title} />
+                      <ItemRoute route={itemRoute(trip, iso, it)} title={it.title}
+                        from={base ? base.stay.name || base.seg.city : ""} />
                       {it.url && <a href={it.url} target="_blank" rel="noreferrer" className="tiny">↗</a>}
                       <Btn className="sm" kind="danger" disabled={readOnly || locked}
                         onClick={() => setDay(iso, (x) => ({ ...x, items: x.items.filter((y) => y.id !== it.id) }))}>×</Btn>

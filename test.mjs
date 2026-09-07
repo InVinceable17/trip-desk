@@ -673,7 +673,7 @@ ok("a day trip doesn't disturb the stay for that segment", () => {
 console.log("\nmaps links");
 import {
   hotelsIn, mapsSearch, placeQuery, placeUrl, isMapsUrl, directions, MAX_WAYPOINTS,
-  itemUrl, stayUrl, legPlaceUrl, legRoute, dayStops, dayRoute, tripRoute,
+  itemUrl, stayUrl, legPlaceUrl, dayBase, itemRoute,
 } from "./src/maps.js";
 
 ok("builds a hotel search for a city", () => {
@@ -799,65 +799,71 @@ ok("an empty row has nothing to point at", () => {
 
 ok("a train leg wants the station, not the middle of town", () => {
   const leg = { ...blankTravel("train"), from: "Rome", to: "Florence" };
+  assert.match(decodeURIComponent(legPlaceUrl(leg, "from")), /Rome train station/);
   assert.match(decodeURIComponent(legPlaceUrl(leg, "to")), /Florence train station/);
-  const r = legRoute(leg);
-  assert.match(decodeURIComponent(r.url), /origin=Rome train station/);
-  assert.match(r.url, /travelmode=transit/);
 });
-ok("a car leg is driven and needs no station", () => {
+ok("a car leg needs no station", () => {
   const leg = { ...blankTravel("car"), from: "Siena", to: "Florence" };
   assert.equal(decodeURIComponent(legPlaceUrl(leg, "to")), "https://www.google.com/maps/search/Florence");
-  assert.match(legRoute(leg).url, /travelmode=driving/);
 });
-ok("a flight gets the airport and no turn-by-turn", () => {
+ok("a flight leg gets the airport", () => {
   const leg = { kind: "flight", from: "ATL", to: "FCO" };
   assert.match(decodeURIComponent(legPlaceUrl(leg, "to")), /FCO airport/);
-  assert.equal(legRoute(leg), null);
 });
 
-ok("a day routes from the booked bed through the day's stops", () => {
+/* Every route in the app is the same two points: the bed, and one thing on
+   the day's list. There is no route that strings stops together. */
+ok("a day sets out from the hotel of the city it sleeps in", () => {
   const t = mapTrip();
-  assert.deepEqual(dayStops(t, "2026-10-13"),
-    ["Hotel Artemide, Via Nazionale 22, Rome", "Colosseum, Rome", "Borghese Gallery, Rome"]);
-  assert.match(dayRoute(t, "2026-10-13").url, /travelmode=walking/);
+  assert.equal(dayBase(t, "2026-10-13").query, "Hotel Artemide, Via Nazionale 22, Rome");
 });
-ok("a bed nobody has booked is not an origin", () => {
-  const t = mapTrip();
-  t.stays[0].status = "Shortlist";
-  assert.deepEqual(dayStops(t, "2026-10-13"), ["Colosseum, Rome", "Borghese Gallery, Rome"]);
-});
-ok("nor is last night's bed in the city you just left", () => {
-  const t = mapTrip();
-  // Oct 16 you wake in Rome and sleep in Florence; the walk is in Florence.
-  t.days["2026-10-16"] = { ...blankDay(), items: [{ ...blankItem("ticket"), title: "Uffizi" }] };
-  assert.deepEqual(dayStops(t, "2026-10-16"), ["Uffizi, Florence"]);
-});
-ok("nor a bed in the city you are not spending the day in", () => {
+ok("even on a day trip, because that is still where you set out from", () => {
   const t = mapTrip();
   t.days["2026-10-13"].city = "Pompeii";
-  assert.deepEqual(dayStops(t, "2026-10-13"), ["Colosseum, Pompeii", "Borghese Gallery, Pompeii"]);
+  assert.equal(dayBase(t, "2026-10-13").seg.city, "Rome");
 });
-ok("one stop is not a day route", () => {
+ok("and on the day you move on, it is the bed at the far end", () => {
+  const t = mapTrip();
+  // Oct 16 you wake in Rome and sleep in Florence, so Florence is the base.
+  t.stays.push({ ...blankStay("s2"), name: "Palazzo Guadagni", status: "Shortlist" });
+  assert.equal(dayBase(t, "2026-10-16").seg.city, "Florence");
+  assert.equal(dayBase(t, "2026-10-16").stay.name, "Palazzo Guadagni");
+});
+ok("a city with no hotel yet has no base, even mid-trip", () => {
+  const t = mapTrip();
+  assert.equal(dayBase(t, "2026-10-16"), null);
+});
+ok("a shortlisted hotel still counts — it is the one the rest of the app names", () => {
+  const t = mapTrip();
+  t.stays[0].status = "Shortlist";
+  assert.equal(dayBase(t, "2026-10-13").stay.name, "Hotel Artemide");
+});
+ok("no hotel for the city, no route to offer", () => {
   const t = mapTrip();
   t.stays = [];
-  t.days["2026-10-13"].items = [{ ...blankItem("idea"), title: "Colosseum" }];
-  assert.equal(dayRoute(t, "2026-10-13"), null);
-  assert.equal(dayRoute(t, "2026-10-15"), null);
+  assert.equal(dayBase(t, "2026-10-13"), null);
+  assert.equal(itemRoute(t, "2026-10-13", t.days["2026-10-13"].items[0]), null);
 });
 
-ok("the trip routes through its cities in order", () => {
-  const r = tripRoute(mapTrip());
-  assert.match(decodeURIComponent(r.url), /origin=Rome&destination=Naples&waypoints=Florence/);
-});
-ok("a night in the air is not a stop on the map", () => {
+ok("an item routes from that hotel to itself, on foot", () => {
   const t = mapTrip();
-  t.segments = [{ ...blankTransit(1) }, ...t.segments];
-  assert.deepEqual(tripRoute(t).stops, ["Rome", "Florence", "Naples"]);
+  const r = itemRoute(t, "2026-10-13", t.days["2026-10-13"].items[0]);
+  assert.equal(decodeURIComponent(r.url),
+    "https://www.google.com/maps/dir/?api=1"
+    + "&origin=Hotel Artemide, Via Nazionale 22, Rome"
+    + "&destination=Colosseum, Rome&travelmode=walking");
 });
-ok("one city is not a route", () => {
+ok("a day trip out of town is not a walk, so it names no mode", () => {
   const t = mapTrip();
-  t.segments = [t.segments[0]];
-  assert.equal(tripRoute(t), null);
+  t.days["2026-10-13"].city = "Pompeii";
+  const r = itemRoute(t, "2026-10-13", t.days["2026-10-13"].items[0]);
+  assert.match(decodeURIComponent(r.url), /origin=Hotel Artemide, Via Nazionale 22, Rome/);
+  assert.match(decodeURIComponent(r.url), /destination=Colosseum, Pompeii/);
+  assert.ok(!/travelmode/.test(r.url), r.url);
+});
+ok("an item with no title has nowhere to route to", () => {
+  const t = mapTrip();
+  assert.equal(itemRoute(t, "2026-10-13", blankItem("idea")), null);
 });
 
 
@@ -1485,23 +1491,32 @@ ok("a day trip's line points where you went, not where you slept", () => {
   assert.ok(line, "expected the day-trip place line");
   assert.match(decodeURIComponent(line.map), /search\/Pompeii/);
 });
-ok("a day with two stops carries the walk on its heading", () => {
+ok("and everything on a day's list carries the way to it from the hotel", () => {
+  const t = docTrip();
+  t.days = { "2026-10-13": { ...blankDay(), items: [{ ...blankItem("idea"), title: "Colosseum" }] } };
+  const line = emitBlocks(t).find((b) => /^Colosseum/.test(b.text));
+  assert.match(decodeURIComponent(line.route), /origin=Hotel Lancelot, Via Capo D'Africa, 47, Roma/);
+  assert.match(decodeURIComponent(line.route), /destination=Colosseum, Rome/);
+  assert.match(line.route, /travelmode=walking/);
+  // Only a day's own items get one — the hotel line is where the route starts.
+  assert.ok(!emitBlocks(t).find((b) => /^Hotel:/.test(b.text)).route);
+});
+ok("a day heading is a heading, with nothing hung off it", () => {
   const t = docTrip();
   t.days = { "2026-10-13": { ...blankDay(), items: [
     { ...blankItem("idea"), title: "Colosseum" },
     { ...blankItem("idea"), title: "Palatine Hill" },
   ] } };
-  const heads = emitBlocks(t).filter((b) => b.kind === "day");
-  const walk = heads.find((b) => /OCTOBER 13$/.test(b.text));
-  assert.match(walk.map, /maps\/dir\/\?api=1/);
-  assert.match(walk.map, /travelmode=walking/);
-  // A day nobody has planned has no walk to offer.
-  assert.equal(heads.find((b) => /OCTOBER 15$/.test(b.text)).map, "");
+  emitBlocks(t).filter((b) => b.kind === "day").forEach((b) => {
+    assert.ok(!b.map, b.text);
+    assert.ok(!b.route, b.text);
+  });
 });
 ok("but none of it reaches the clipboard, which is her document", () => {
   const t = docTrip();
   t.days = { "2026-10-13": { ...blankDay(), items: [{ ...blankItem("ticket"), title: "Colosseum" }] } };
   const out = emitText(t);
+  assert.ok(!/maps\/dir/.test(out), out);
   assert.ok(!/google\.com\/maps/.test(out), out);
   assert.ok(!/\[map\]/.test(out), out);
   // and what does belong to the doc is untouched.

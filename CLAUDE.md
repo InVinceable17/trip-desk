@@ -54,14 +54,20 @@ indented three spaces beneath — including the abbreviations `TUES` and `THUR`,
 which are hers and not the standard ones.
 
 **A pin is on the block, never in the text.** Every emitted bullet that names
-somewhere carries a `map`, and a day with a walk in it carries the route on its
-heading — `blocks()` builds them, `Output.jsx` renders them, and `text()`
-deliberately drops the field. The clipboard is what pastes over the top of her
-document, and a map link is the app's own working, not a line she wrote. It
-would also not survive the round trip: `doc-parse` takes the first URL on a
-bullet as the item's link and leaves the rest in the title, so a trailing
-`[map](…)` would come back as `Lunch near Monti [map]()` with a maps URL where
-the ticket link belongs. A test asserts `emitText` contains no `google.com/maps`.
+somewhere carries a `map`, and every line on a day's own list also carries a
+`route` — the way to it from that day's hotel. `blocks()` builds them,
+`Output.jsx` renders them, and `text()` deliberately drops both fields. The
+clipboard is what pastes over the top of her document, and a map link is the
+app's own working, not a line she wrote. It would also not survive the round
+trip: `doc-parse` takes the first URL on a bullet as the item's link and leaves
+the rest in the title, so a trailing `[map](…)` would come back as `Lunch near
+Monti [map]()` with a maps URL where the ticket link belongs. A test asserts
+`emitText` contains no `google.com/maps`.
+
+**The day heading carries nothing.** It briefly carried the day's walk; the
+route through a day assumed the order the items were typed in was a plan, and
+it is not — it is the order somebody thought of them. A test asserts every
+`kind: "day"` block has neither field.
 
 **The pin says where the plane lands, not where the sentence says you are.**
 "Arrive in Rome" is right for the document — you are going to Rome — but the
@@ -115,24 +121,30 @@ the `/maps/dir/?api=1` scheme. A day longer than that would come back looking
 routed while quietly missing stops, so `directions()` trims and reports
 `dropped`.
 
-**The start of a day is a bed you have booked, in the city you are in.**
-`dayStops()` anchors on the stay only when its status is Booked *and* its city
-is the day's city. An origin you have not committed to is a guess about where
-you will be standing that morning; a bed in the wrong city is worse — on the
-day you move to Florence you wake in Rome, and the walking route the anchor
-produced ran 270km. Both conditions drop the anchor rather than bend the route,
-and a day trip loses it for the same reason. Under two stops there is no route
-at all: the pin on the item already says where it is.
+**Every route is the hotel and one thing.** `itemRoute()` is the only route in
+the app, and it has exactly two points: `dayBase()` — the stay for the segment
+you *sleep* in that night — and the item. There is deliberately no route that
+strings a day's stops together, no route through the trip's cities, and no
+directions along a travel leg. A chained route assumes the order the items were
+typed in is the order you will walk them, and it is not; what you want standing
+in the lobby is how to reach the next thing.
 
-**A flight gets an airport and no turn-by-turn.** `legRoute()` returns null for
-one; Maps will otherwise cheerfully offer thirty hours of driving from Atlanta
-to Rome. The other kinds carry both a mode (train, bus and ferry ride transit;
-a car drives) and a station hint, because "Naples" alone lands you in the
-middle of Naples rather than at Centrale.
+**The base is where you sleep, not where you spend the day.** On a day trip to
+Pompeii you still set out from the Rome hotel, so `dayBase()` reads
+`dayStay().sleepSeg` and ignores the day-trip override. On the day you move to
+Florence it is the Florence bed, because that is the one you are heading for.
+It uses `leadStay()` — booked first, then the cheapest shortlisted — so it can
+never name a different hotel than the cost breakdown and the ribbon do. No
+stay for that segment means no route offered, not a route from the city centre.
 
-**A night in the air is not a stop on the map.** `tripRoute()` runs through
-`cityStops()`, so the same rule that keeps a transit segment out of the Cities
-list keeps it off the route.
+**Walking only inside one city.** `itemRoute()` sets `travelmode=walking` when
+the item's city matches the bed's, and names no mode otherwise: the trip out to
+Pompeii is not a walk, and Maps picks one you can change in a tap.
+
+**A leg gets a place, not directions.** `legPlaceUrl()` gives the end of a
+travel leg with a station hint — "Naples" alone lands you in the middle of
+Naples rather than at Centrale — and there is no `legRoute`. The leg *is* the
+directions; the train is already booked.
 
 ## The doc behind a trip
 

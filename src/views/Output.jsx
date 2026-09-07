@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { blocks, text as itineraryText, pieces, blankDays, docDays } from "../doc-emit.js";
+import { blocks, text as itineraryText, pieces, blankDays, docDays, routeFrom } from "../doc-emit.js";
 import { Btn } from "../components/ui.jsx";
 
 /* ============================================================================
@@ -22,10 +22,11 @@ import { Btn } from "../components/ui.jsx";
    keystroke and the line it rewrites happen in the same paint. Nothing is
    cached and there is nothing to invalidate.
 
-   Every line that is somewhere carries a pin, and a day with a walk in it
-   carries the walk on its heading. They are properties of the block rather
-   than of its text, so they show here and stay out of what Copy puts on the
-   clipboard: the document is what she wrote, and the pins are how you read it.
+   Every line that is somewhere carries a pin, and everything on a day's own
+   list also carries the way to it from that day's hotel. They are properties
+   of the block rather than of its text, so they show here and stay out of what
+   Copy puts on the clipboard: the document is what she wrote, and the links
+   are how you read it.
    ========================================================================== */
 
 export default function Output({ trip, open, onClose }) {
@@ -81,15 +82,7 @@ export default function Output({ trip, open, onClose }) {
               {bs.map((b, i) => {
                 if (b.kind === "title") return <h1 key={i} className="sd-title">{b.text}</h1>;
                 if (b.kind === "range") return <p key={i} className="sd-range">{b.text}</p>;
-                if (b.kind === "day") return (
-                  <h2 key={i} className="sd-day">
-                    {b.text}
-                    {b.map && (
-                      <a className="sd-walk" href={b.map} target="_blank" rel="noreferrer"
-                        title="Walk this day in Google Maps">route ↗</a>
-                    )}
-                  </h2>
-                );
+                if (b.kind === "day") return <h2 key={i} className="sd-day">{b.text}</h2>;
                 return (
                   <p key={i} className={`sd-b${b.depth ? " sub" : ""}`}>
                     {pieces(b.text).map((x, j) => (x.url
@@ -99,6 +92,13 @@ export default function Output({ trip, open, onClose }) {
                       <a className="pin" href={b.map} target="_blank" rel="noreferrer"
                         title={`${b.text} in Google Maps`} aria-label={`Open ${b.text} in Google Maps`}>
                         <span aria-hidden="true">📍</span>
+                      </a>
+                    )}
+                    {b.route && (
+                      <a className="sd-from" href={b.route} target="_blank" rel="noreferrer"
+                        title={`Directions from ${routeFrom(trip, b.iso) || "the hotel"}`}
+                        aria-label={`Directions from ${routeFrom(trip, b.iso) || "the hotel"} to ${b.text}`}>
+                        from hotel ↗
                       </a>
                     )}
                   </p>

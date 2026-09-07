@@ -180,19 +180,20 @@ the day picker, the rules) uses `wholeDay`; stops and hotel bars use
 
 ## Maps
 
-Anything that is somewhere carries a pin, and anything that is several
-somewheres carries a route. Day items and hotels get a 📍 that opens Google
-Maps on that place, named and qualified by the city it is in; a day with two or
-more stops gets `route ↗` in its header, walking, from the booked hotel through
-the day in the order it is written; the Cities card gets one route through the
-whole trip; a train or ferry leg gets directions between the two stations, and
-a flight gets its arrival airport.
+Anything that is somewhere carries a pin. Day items and hotels get a 📍 that
+opens Google Maps on that place, named and qualified by the city it is in;
+cities and travel legs get a plain map link, with a station hint so "Naples"
+means Centrale.
 
-The itinerary drawer carries them too: every line that names somewhere gets a
-pin, and a day with a walk in it gets the route on its heading. Those live on
-the block rather than in its text, so **Copy** still puts the plain document on
-the clipboard — a map link is derived, and pasting it back into the planning
-doc would be the app writing its own working into somebody else's document.
+Anything on a day's list also carries `from hotel ↗`: directions from that
+night's hotel to that one thing. Two points, never a chain — the order you
+typed the day in is not the order you will walk it. Walking inside a city, and
+no stated mode when the day goes out of town.
+
+The itinerary drawer carries both. They live on the block rather than in its
+text, so **Copy** still puts the plain document on the clipboard — the links
+are derived, and pasting them back into the planning doc would be the app
+writing its own working into somebody else's document.
 
 Nothing new is stored. The links are derived from the titles, addresses and
 cities already in the trip — except that a Google Maps URL pasted into an

@@ -5,7 +5,7 @@ import {
   addSegment, moveSegment, segColor, bookedFlight,
   cityPlan, setDayTrip, isTransitStop, transitGap, addTransit,
 } from "../model.js";
-import { mapsSearch, tripRoute } from "../maps.js";
+import { mapsSearch } from "../maps.js";
 import { Btn, Card } from "../components/ui.jsx";
 
 /* Phase 3. Ordered city segments, laid on the ribbon and draggable there.
@@ -33,8 +33,6 @@ export default function Cities({ trip, update, readOnly }) {
   /* Counts are about places you are going, so a night under way is not one. */
   const cities = (trip.segments || []).filter((s) => !isTransitStop(trip, s));
   const cityCount = cities.length;
-  /* The trip drawn on one map: the cities in order, nights in the air left out. */
-  const route = tripRoute(trip);
 
   const setSegments = (next) =>
     update((t) => ({ ...t, segments: typeof next === "function" ? next(t.segments) : next }));
@@ -179,18 +177,10 @@ export default function Cities({ trip, update, readOnly }) {
         title="Cities"
         accent
         right={
-          <span className="segright">
-            <span className={`nightcount${got === total && total ? " ok" : ""}`}>
-              <b>{got}</b> of <b>{total}</b> nights
-              {cityCount > 0 && (
-                <> · <b>{cities.filter((s) => s.locked).length}</b> of <b>{cityCount}</b> locked</>
-              )}
-            </span>
-            {route && (
-              <span className="maplinks">
-                <a href={route.url} target="_blank" rel="noreferrer"
-                  title={`The whole route in Google Maps — ${route.stops.join(" → ")}`}>route ↗</a>
-              </span>
+          <span className={`nightcount${got === total && total ? " ok" : ""}`}>
+            <b>{got}</b> of <b>{total}</b> nights
+            {cityCount > 0 && (
+              <> · <b>{cities.filter((s) => s.locked).length}</b> of <b>{cityCount}</b> locked</>
             )}
           </span>
         }

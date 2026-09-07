@@ -5,13 +5,13 @@
    off to the Maps app on a phone rather than opening the website:
 
      /maps/search/<query>                 one place
-     /maps/dir/?api=1&origin=…&…          a route through several
+     /maps/dir/?api=1&origin=…&…          how to get there from the hotel
 
    Everything here is pure. The trip-aware helpers read model.js; model.js
    must never read this, or the import goes in a circle.
    ========================================================================== */
 
-import { cityForDay, dayStay, cityStops } from "./model.js";
+import { cityForDay, dayStay, leadStay } from "./model.js";
 
 const BASE = "https://www.google.com/maps";
 
@@ -135,61 +135,47 @@ export function legPlaceUrl(leg, which) {
   return q ? mapsSearch(q) : null;
 }
 
-const LEG_MODE = { train: "transit", bus: "transit", ferry: "transit", car: "driving", transfer: "driving" };
-
-/**
- * Getting from one end of a leg to the other. A flight gets none: nobody needs
- * turn-by-turn from Atlanta to Rome, and Maps will cheerfully offer it.
- */
-export function legRoute(leg) {
-  if (!leg || leg.kind === "flight") return null;
-  return directions(
-    [endpoint(leg.kind, leg.from), endpoint(leg.kind, leg.to)],
-    LEG_MODE[leg.kind] || "",
-  );
-}
-
 const sameCity = (a, b) => !!text(a) && text(a).toLowerCase() === text(b).toLowerCase();
 
 /**
- * The stops of one day, in the order they are written down.
+ * The hotel a day is run out of: the stay for the segment you *sleep* in that
+ * night, which is not always the city the day is spent in. On a day trip to
+ * Pompeii you still set out from the Rome hotel, and that is exactly the one
+ * you want directions from. On the day you fly home there is no bed left, so
+ * it falls back to the one you woke in.
  *
- * It starts at the hotel, under two conditions. The bed has to be booked — an
- * origin you have not committed to is a guess about where you will be standing
- * that morning, and a wrong origin bends the whole route. And it has to be in
- * the city the day is spent in: on the day you move to Florence you wake in
- * Rome, and a walk from last night's hotel to today's first stop is a walk of
- * 270km. No origin at all just starts you at the first thing on the list,
- * which is honest. The same rule quietly drops the hotel on a day trip, for
- * the same reason.
+ * `leadStay` picks which stay counts — booked first, then the cheapest
+ * shortlisted — the same answer the cost breakdown and the ribbon give, so
+ * this cannot name a different hotel than the rest of the app does.
  */
-export function dayStops(t, iso) {
-  const city = dayCity(t, iso);
-  const out = [];
+export function dayBase(t, iso) {
   const st = dayStay(t, iso) || {};
-  const seg = [st.sleepSeg, st.wakeSeg].find((x) => x && sameCity(x.city, city));
-  const bed = seg && (t.stays || []).find((s) => s.segmentId === seg.id && s.status === "Booked");
-  if (bed) out.push(placeQuery(bed.name, bed.address, seg.city));
-  (((t.days || {})[iso] || {}).items || []).forEach((it) => {
-    if (text(it.title)) out.push(placeQuery(it.title, city));
-  });
-  return out.filter(Boolean);
+  const seg = st.sleepSeg || st.wakeSeg;
+  if (!seg) return null;
+  const stay = leadStay(t, seg.id);
+  if (!stay || (!text(stay.name) && !text(stay.address))) return null;
+  return { seg, stay, query: placeQuery(stay.name, stay.address, seg.city) };
 }
 
 /**
- * The day on foot. Walking, because these are stops inside one city — getting
- * to another city is a leg in Transport, and that carries its own mode.
+ * Directions from that hotel to one thing on that day's list.
+ *
+ * Deliberately only ever two points. A route that strings the day's stops
+ * together in the order they were typed assumes the order is a plan, and it
+ * is not — it is the order somebody thought of them. What you actually want
+ * standing in the lobby is how to get to the next thing.
+ *
+ * Walking when the stop is in the same city as the bed; otherwise no mode at
+ * all, because the trip out to Pompeii is not a walk and Maps will choose one
+ * you can change in a tap.
  */
-export const dayRoute = (t, iso) => directions(dayStops(t, iso), "walking");
-
-/**
- * The whole trip as one route: the cities, in order. A night in the air is
- * not a stop on a map — the plane's path is not the drive — and two nights in
- * one city are one stop, not two. No travel mode: which of a train and a car
- * this is varies leg by leg, and Maps will pick one you can change in a tap.
- */
-export function tripRoute(t) {
-  const cities = cityStops(t).map((s) => text(s.city)).filter(Boolean);
-  const stops = cities.filter((c, i) => i === 0 || c.toLowerCase() !== cities[i - 1].toLowerCase());
-  return directions(stops);
+export function itemRoute(t, iso, item) {
+  if (!item || !text(item.title)) return null;
+  const base = dayBase(t, iso);
+  if (!base) return null;
+  const city = dayCity(t, iso);
+  return directions(
+    [base.query, placeQuery(item.title, city)],
+    sameCity(base.seg.city, city) ? "walking" : "",
+  );
 }

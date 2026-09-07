@@ -8,28 +8,19 @@ import { parsePaste } from "../parsers.js";
 import { scanSearch, resolveFlightNo, checkPrice, callCost, errText } from "../scrape.js";
 import { stashDraft, takeDraft } from "../store.js";
 import { blankTravel, TRAVEL_KINDS, KIND_GLYPH, travelLegs, fmtMoney, bookedFlight } from "../model.js";
-import { legPlaceUrl, legRoute } from "../maps.js";
+import { legPlaceUrl } from "../maps.js";
 import { HOSTED } from "../store.js";
 import { Field, Btn, Spinner, Card, money, Amount } from "../components/ui.jsx";
 
-/* Where a leg puts you, and how you get across it. The station hint and the
-   travel mode are picked from the leg's kind in maps.js; a flight gets the
-   airport and no directions. */
+/* Where a leg puts you down. The station hint comes from the leg's kind in
+   maps.js, so "Naples" resolves to Centrale rather than the middle of town.
+   The place, and not directions to it: the leg is the directions. */
 function LegMaps({ leg }) {
   const to = legPlaceUrl(leg, "to");
-  const route = legRoute(leg);
-  if (!to && !route) return null;
+  if (!to) return null;
   return (
-    <>
-      {to && (
-        <a className="tiny" href={to} target="_blank" rel="noreferrer"
-          title={`${leg.to} in Google Maps`}>{leg.to} ↗</a>
-      )}
-      {route && (
-        <a className="tiny" href={route.url} target="_blank" rel="noreferrer"
-          title={`Directions ${leg.from} → ${leg.to}`}>route ↗</a>
-      )}
-    </>
+    <a className="tiny" href={to} target="_blank" rel="noreferrer"
+      title={`${leg.to} in Google Maps`}>{leg.to} ↗</a>
   );
 }
 
