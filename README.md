@@ -200,6 +200,23 @@ cities already in the trip — except that a Google Maps URL pasted into an
 item's or a hotel's link field wins, because a saved pin is the exact place and
 a search is a guess at it. `src/maps.js` holds all of it and is pure.
 
+## The day of
+
+`#/t/<id>/today` — the second view, and the one for the trip itself rather than
+the planning of it. One day at a time, no desk chrome, nothing editable: where
+you are, the bed you are coming back to, the legs that move you, and the day's
+list. Every line carries two big targets — **Map** for the place, **From
+hotel** for the way there. It opens on the real current date, so the URL can go
+on a phone's home screen and be right every morning; days are numbered as the
+itinerary numbers them.
+
+Where a title is not a location — a tour met at a street corner — the Days
+phase has a **Map places** switch that opens a location line under every item.
+Type an address, or paste a Google Maps link for the exact pin. The placeholder
+shows the guess the app would make on its own, so you can see what you are
+overriding. Everything downstream — the pin, the route, the itinerary drawer,
+the day-of screen — follows it.
+
 ## Storage, and the trap that shapes it
 
 ```

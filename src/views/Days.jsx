@@ -4,7 +4,7 @@ import {
   tripDays, cityForDay, blankItem, blankDay, ITEM_KINDS, openBookings,
   segmentSpans, lockedDayCount, dayStay, travelOn, KIND_GLYPH, fmtMoney,
 } from "../model.js";
-import { mapsSearch, itemUrl, itemRoute, dayBase } from "../maps.js";
+import { mapsSearch, itemUrl, itemRoute, itemQuery, dayBase, isMapsUrl } from "../maps.js";
 import { Btn, Card, Amount } from "../components/ui.jsx";
 
 /* Phase 5. Every day open by default and notes that grow as you type, so the
@@ -48,10 +48,37 @@ const ItemRoute = ({ route, from, title }) => (route ? (
     aria-label={`Directions from ${from} to ${title || "this"}`}>from hotel ↗</a>
 ) : null);
 
+/**
+ * Where this actually is. The placeholder is what the app would search for on
+ * its own, so the guess is visible before you decide whether to override it —
+ * without that you are correcting something you cannot see. A Google Maps link
+ * pasted here is taken as the exact pin; anything else is searched verbatim.
+ */
+const ItemPlace = ({ value, derived, url, disabled, onChange }) => (
+  <div className="itemplace">
+    <span className="lbl">Map place</span>
+    <input
+      className="bare grow" value={value || ""} disabled={disabled}
+      placeholder={derived || "where is it?"}
+      onChange={(e) => onChange(e.target.value)}
+    />
+    {value ? (
+      <span className="chip">{isMapsUrl(value) ? "saved pin" : "yours"}</span>
+    ) : derived ? (
+      <span className="chip dim">from the title</span>
+    ) : null}
+    {url && <a className="tiny" href={url} target="_blank" rel="noreferrer">check ↗</a>}
+  </div>
+);
+
 export default function Days({ trip, update, readOnly }) {
   const days = tripDays(trip);
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [tripOpen, setTripOpen] = useState(() => new Set());
+  /* One switch for the whole phase rather than a control per row: adding the
+     places is a pass you make down the trip, not something you do to one item
+     while doing something else to it. */
+  const [places, setPlaces] = useState(false);
   const todo = openBookings(trip);
   const known = [...new Set(segmentSpans(trip).map((x) => x.seg.city).filter(Boolean))];
   const lockedCount = lockedDayCount(trip);
@@ -91,6 +118,11 @@ export default function Days({ trip, update, readOnly }) {
         <div className="grow" />
         <Btn className="sm" onClick={() => setAll(true)}>Collapse all</Btn>
         <Btn className="sm" onClick={() => setAll(false)}>Expand all</Btn>
+        <Btn className="sm" kind={places ? "solid" : "ghost"} aria-pressed={places}
+          onClick={() => setPlaces((v) => !v)}
+          title="Show where each thing is on the map, and fix the ones the title cannot say">
+          Map places
+        </Btn>
         <Btn className="sm" disabled={readOnly} onClick={() => lockAll(lockedCount !== days.length)}>
           {lockedCount === days.length ? "Unlock all" : "Lock all"}
         </Btn>
@@ -238,6 +270,13 @@ export default function Days({ trip, update, readOnly }) {
                       {it.url && <a href={it.url} target="_blank" rel="noreferrer" className="tiny">↗</a>}
                       <Btn className="sm" kind="danger" disabled={readOnly || locked}
                         onClick={() => setDay(iso, (x) => ({ ...x, items: x.items.filter((y) => y.id !== it.id) }))}>×</Btn>
+                      {places && (
+                        <ItemPlace
+                          value={it.place} derived={itemQuery(trip, iso, { ...it, place: "" })}
+                          url={itemUrl(trip, iso, it)} disabled={readOnly || locked}
+                          onChange={(v) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, place: v } : y)) }))}
+                        />
+                      )}
                     </div>
                   ))}
 

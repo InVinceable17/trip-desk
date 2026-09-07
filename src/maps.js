@@ -97,15 +97,33 @@ const text = (v) => String(v == null ? "" : v).trim();
 const dayCity = (t, iso) => ((cityForDay(t, iso) || {}).city || "");
 
 /**
- * The place a day's item points at. A link already pasted in wins; otherwise
- * the title, in the city that day is spent in. An item with no title is not a
- * place yet, and gets no pin.
+ * What a day's item resolves to on the map, as a query.
+ *
+ * `item.place` is the override, and it is taken verbatim — no city appended.
+ * Somebody who bothered to type "Piazza di San Lorenzo, 35R, Firenze" has
+ * already said which city, and a tour met at a street corner is the whole
+ * reason the field exists. With nothing there, the title in the day's city is
+ * the guess, and it is a good one for a museum and a poor one for a tour.
+ */
+export function itemQuery(t, iso, item) {
+  if (!item) return "";
+  const p = text(item.place);
+  if (p && !isMapsUrl(p)) return p;
+  if (!text(item.title)) return "";
+  return placeQuery(item.title, dayCity(t, iso));
+}
+
+/**
+ * The place a day's item points at. A Google Maps link pasted into `place` is
+ * the most exact thing there is, so it opens as-is; then the typed place, then
+ * a maps link left in the item's ordinary link field, then the title.
  */
 export function itemUrl(t, iso, item) {
   if (!item) return null;
-  if (isMapsUrl(item.url)) return text(item.url);
-  if (!text(item.title)) return null;
-  return placeUrl(item.title, dayCity(t, iso));
+  if (isMapsUrl((item || {}).place)) return text(item.place);
+  if (!text(item.place) && isMapsUrl(item.url)) return text(item.url);
+  const q = itemQuery(t, iso, item);
+  return q ? mapsSearch(q) : null;
 }
 
 /** The place a stay is. The address is the whole reason it is stored. */
@@ -170,12 +188,15 @@ export function dayBase(t, iso) {
  * you can change in a tap.
  */
 export function itemRoute(t, iso, item) {
-  if (!item || !text(item.title)) return null;
+  /* A saved maps link cannot be a destination — the directions API wants a
+     place, and a short link is opaque until Google resolves it — so a route
+     falls back to the title where `place` holds a URL. */
+  const to = itemQuery(t, iso, item);
+  if (!to) return null;
   const base = dayBase(t, iso);
   if (!base) return null;
-  const city = dayCity(t, iso);
   return directions(
-    [base.query, placeQuery(item.title, city)],
-    sameCity(base.seg.city, city) ? "walking" : "",
+    [base.query, to],
+    sameCity(base.seg.city, dayCity(t, iso)) ? "walking" : "",
   );
 }

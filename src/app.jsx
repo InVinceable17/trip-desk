@@ -19,6 +19,7 @@ import Stays from "./views/Stays.jsx";
 import Days from "./views/Days.jsx";
 import Backup from "./views/Backup.jsx";
 import Output from "./views/Output.jsx";
+import Today from "./views/Today.jsx";
 import SignIn from "./views/SignIn.jsx";
 import { SourceBar } from "./views/Source.jsx";
 
@@ -30,6 +31,10 @@ function parseHash() {
   if (/^#\/backup/.test(location.hash || "")) return { view: "backup" };
   const m = /^#\/t\/([^/]+)(?:\/([^/]+))?/.exec(location.hash || "");
   if (!m) return { view: "trips" };
+  /* `today` is not a phase — it is the other way of looking at the same trip,
+     and it deliberately gets its own screen rather than a sixth step. The URL
+     carries no date, so the same bookmark is right every morning. */
+  if (m[2] === "today") return { view: "today", id: m[1] };
   return { view: "trip", id: m[1], phase: PHASE_KEYS.includes(m[2]) ? m[2] : "dates" };
 }
 
@@ -183,6 +188,15 @@ function App() {
   const trip = route.view === "trip" ? db.trips[route.id] : null;
   const who = (user && (user.displayName || user.email)) || "";
 
+  /* The day-of screen is the whole page. Not a panel inside the desk: the
+     chrome around a planning tool — ribbon, stepper, running total — is
+     exactly what you do not want in your hand on a street corner. */
+  if (route.view === "today") {
+    const t = db.trips[route.id];
+    if (!t) { go("#/"); return null; }
+    return <Today trip={t} onBack={() => go(`#/t/${t.id}/days`)} />;
+  }
+
   return (
     <div className="wrap">
       <Header
@@ -326,6 +340,7 @@ function Header({ trip, saving, mode, onHome, onRename, onCost, costOpen, onDoc,
               </button>
               <button className={`link${docOpen ? " on" : ""}`} onClick={onDoc}
                 aria-expanded={docOpen}>itinerary</button>
+              <button className="link" onClick={() => go(`#/t/${trip.id}/today`)}>day of</button>
               <button className="link" onClick={() => go("#/backup")}>backups</button>
             </div>
           </>

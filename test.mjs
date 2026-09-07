@@ -673,7 +673,7 @@ ok("a day trip doesn't disturb the stay for that segment", () => {
 console.log("\nmaps links");
 import {
   hotelsIn, mapsSearch, placeQuery, placeUrl, isMapsUrl, directions, MAX_WAYPOINTS,
-  itemUrl, stayUrl, legPlaceUrl, dayBase, itemRoute,
+  itemUrl, itemQuery, stayUrl, legPlaceUrl, dayBase, itemRoute,
 } from "./src/maps.js";
 
 ok("builds a hotel search for a city", () => {
@@ -781,6 +781,43 @@ ok("an ordinary link does not", () => {
 ok("an item with no title is not a place yet", () => {
   const t = mapTrip();
   assert.equal(itemUrl(t, "2026-10-13", blankItem("idea")), null);
+});
+
+/* The override. A tour is booked under a name and met on a street corner, and
+   no amount of guessing turns "Guru Walk Rome walking tour" into a location. */
+ok("a place you typed is used verbatim, city and all", () => {
+  const t = mapTrip();
+  const it = { ...blankItem("reservation"), title: "Guru Walk Rome", place: "Piazza di Spagna, Roma" };
+  assert.equal(itemQuery(t, "2026-10-13", it), "Piazza di Spagna, Roma");
+  assert.equal(decodeURIComponent(itemUrl(t, "2026-10-13", it)),
+    "https://www.google.com/maps/search/Piazza di Spagna, Roma");
+});
+ok("and it beats a maps link sitting in the ordinary link field", () => {
+  const t = mapTrip();
+  const it = { ...blankItem("idea"), title: "x", place: "Termini, Rome", url: "https://maps.app.goo.gl/old" };
+  assert.match(decodeURIComponent(itemUrl(t, "2026-10-13", it)), /Termini, Rome/);
+});
+ok("a maps link in the place field is the exact pin, opened as-is", () => {
+  const t = mapTrip();
+  const it = { ...blankItem("idea"), title: "the meeting point", place: "https://maps.app.goo.gl/abc" };
+  assert.equal(itemUrl(t, "2026-10-13", it), "https://maps.app.goo.gl/abc");
+});
+ok("but a route cannot depart for a URL, so it falls back to the title", () => {
+  const t = mapTrip();
+  const it = { ...blankItem("idea"), title: "Trevi Fountain", place: "https://maps.app.goo.gl/abc" };
+  assert.equal(itemQuery(t, "2026-10-13", it), "Trevi Fountain, Rome");
+  assert.match(decodeURIComponent(itemRoute(t, "2026-10-13", it).url), /destination=Trevi Fountain, Rome/);
+});
+ok("a typed place is where the route goes too", () => {
+  const t = mapTrip();
+  const it = { ...blankItem("reservation"), title: "Food tour", place: "Via Zamboni 8c, Bologna" };
+  assert.match(decodeURIComponent(itemRoute(t, "2026-10-13", it).url), /destination=Via Zamboni 8c, Bologna/);
+});
+ok("an old item with no place field at all still works", () => {
+  const t = mapTrip();
+  const { place, ...legacy } = { ...blankItem("idea"), title: "Pantheon" };
+  assert.equal(itemQuery(t, "2026-10-13", legacy), "Pantheon, Rome");
+  assert.match(itemUrl(t, "2026-10-13", legacy), /Pantheon/);
 });
 
 ok("a hotel links by its address", () => {

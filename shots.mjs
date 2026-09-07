@@ -77,6 +77,20 @@ await shot("phone-cities", "#/t/t1/cities", "light", 390);
   await p.screenshot({ path: "shot-cost.png", fullPage: true });
   await p.close();
 }
+/* The day-of screen, on a phone, on a day that actually has something on it —
+   it opens on day one, which for this trip is the flight out. */
+{
+  const p = await b.newPage({ viewport: { width: 390, height: 900 }, colorScheme: "light" });
+  p.on("pageerror", (e) => errs.push("dayof: " + e.message));
+  await p.addInitScript(() => { window.claude = { use: async () => null }; });
+  await p.goto("http://localhost:8811/#/t/t1/today", { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  await p.click(".do-arrow:last-of-type");
+  await p.waitForTimeout(250);
+  await p.screenshot({ path: "shot-phone-dayof.png", fullPage: true });
+  await p.close();
+}
+
 /* The drawer is only ever open by hand, so it needs its own pass. */
 {
   const p = await b.newPage({ viewport: { width: 1440, height: 1100 }, colorScheme: "light" });

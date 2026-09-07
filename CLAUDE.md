@@ -146,6 +146,56 @@ travel leg with a station hint — "Naples" alone lands you in the middle of
 Naples rather than at Centrale — and there is no `legRoute`. The leg *is* the
 directions; the train is already booked.
 
+## Two views of one trip
+
+The five phases are for deciding; `src/views/Today.jsx` is for the morning you
+wake up in Florence with one hand free. `#/t/<id>/today`, reached from the
+**day of** button in the header.
+
+**It is its own screen, not a denser desk.** `parseHash` returns
+`view: "today"` and `App` returns `<Today>` before the wrap — no ribbon, no
+stepper, no cost bar, no source bar, nothing editable. A check asserts the
+screen carries no `input`, `textarea` or `select` at all: what you do not want
+on a street corner is a form.
+
+**The URL carries no date.** It resolves to the real current day every time it
+is opened, which is what lets it sit on a phone's home screen and be right
+every morning. Outside the trip it opens on day one and says how far off that
+is. Days are `docDays`, so day numbers match the itinerary.
+
+**It does not sort the day.** Half the lines have no time, and the plan
+somebody wrote is a sequence — a view that reorders it is a view that
+disagrees with the document. Times are shown; the order is the doc's.
+
+**One layout, no media query.** The day-of CSS is sized for a thumb and simply
+centres on a laptop; a one-day-at-a-time list wants a column either way.
+
+## The place a line actually is
+
+`item.place` is the override behind every pin. A tour is booked under a name
+and met on a street corner: "Guru Walk Rome walking tour" is not a location and
+no amount of guessing makes it one. Empty means "work it out from the title and
+the day's city", which is right for a museum and useless for a pickup point.
+
+**Taken verbatim, city and all.** `itemQuery()` does not append the day's city
+to a place somebody typed — they already said which city, and appending
+"Florence" to a Firenze address is the app second-guessing an instruction.
+
+**A Maps URL in `place` is the exact pin** and opens as-is. It cannot be a
+route *destination* though — the directions API wants a place and a short link
+is opaque until Google resolves it — so `itemRoute()` falls back to the title
+there. A test pins that.
+
+**The editor is a pass, not a per-row control.** Days has one `Map places`
+switch that opens a location line under every item, because adding these is
+something you do down the trip in one go. The input's placeholder is the query
+the app would use on its own: correcting a guess you cannot see is not
+correcting anything.
+
+**`blankItem` gains `place` safely** because day items are stored as written
+and never spread over a fresh blank — unlike segments and stays, `hydrateTrip`
+does not touch `days`. A test reads an item with no `place` key at all.
+
 ## The doc behind a trip
 
 A trip can be a structured view of a Google Doc somebody else actually writes

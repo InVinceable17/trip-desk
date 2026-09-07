@@ -89,8 +89,14 @@ export const blankStay = (segmentId = "") => ({
   status: "Maybe", ref: "", notes: "", address: "", nightsOverride: null,
 });
 
+/* `place` is where this actually is, when the title does not say. A tour is
+   booked under a name and met at a street corner; "Guru Walk Rome walking
+   tour" is not a location and no amount of guessing makes it one. Empty means
+   "work it out from the title and the city", which is right most of the time —
+   this is the override for when it is not. Additive: day items are stored as
+   written and never spread over a fresh blank, so old trips simply have none. */
 export const blankItem = (kind = "idea") => ({
-  id: uid("it"), title: "", url: "", cost: "", currency: "USD", time: "", kind, done: false,
+  id: uid("it"), title: "", url: "", place: "", cost: "", currency: "USD", time: "", kind, done: false,
 });
 
 /* `city` is a day-trip override: where you spend the day when that is not the

@@ -196,6 +196,37 @@ check("a second thing gets its own route from the same hotel, not a chain", awai
     && hrefs.every((h) => /origin=Hotel%20Artemide/.test(h) && !/waypoints/.test(h))
     && day.querySelectorAll(".day-head a[href*='/maps/dir/']").length === 0;
 }));
+
+/* The one thing the editor is actually for: telling the app where a line is
+   when its title cannot say. A tour is booked under a name and met on a
+   corner, and no amount of guessing gets you there. */
+console.log("\nmap places");
+const place = p.locator(".day:first-child .itemplace input").first();
+const pin1 = p.locator(".day:first-child .item a.pin").first();
+const dir1 = p.locator(".day:first-child .item a[href*='/maps/dir/']").first();
+check("the location pass is off until you ask for it",
+  (await p.locator(".itemplace").count()) === 0);
+await p.click(".toolbar button:has-text('Map places')");
+await p.waitForTimeout(250);
+check("switching it on opens a location line under every item",
+  (await p.locator(".day:first-child .itemplace").count()) === 2);
+check("and it shows the guess it would otherwise make, so you can see it first",
+  /Colosseum, Rome/.test(await place.getAttribute("placeholder")),
+  await place.getAttribute("placeholder"));
+const beforePlace = await pin1.getAttribute("href");
+await place.fill("Piazza del Colosseo, 1, Roma");
+await p.waitForTimeout(300);
+const afterPlace = await pin1.getAttribute("href");
+check("typing one moves the pin to it, verbatim",
+  afterPlace !== beforePlace && /Piazza%20del%20Colosseo/.test(afterPlace), afterPlace);
+check("and the route goes there too",
+  /destination=Piazza%20del%20Colosseo/.test(await dir1.getAttribute("href")));
+await place.fill("");
+await p.waitForTimeout(250);
+check("clearing it falls back to the title again",
+  (await pin1.getAttribute("href")) === beforePlace);
+await p.click(".toolbar button:has-text('Map places')");
+await p.waitForTimeout(200);
 await p.waitForTimeout(300);
 const finalLayers = await layers();
 check("by the last phase the ribbon carries every layer, hotels above cities",
@@ -282,6 +313,47 @@ await p.click(".link:has-text('itinerary')");
 await p.waitForTimeout(300);
 check("and it folds away again", await p.evaluate(
   () => !document.querySelector(".docdrawer").classList.contains("open")));
+
+/* The other view. Not a denser desk — its own screen, one day at a time, with
+   the two links that matter made big enough to hit while walking. Navigated by
+   the hash rather than a reload, because a reload here re-reads the fixture
+   and would throw away everything the checks above have done. */
+console.log("\nthe day of");
+const tripId = await p.evaluate(() => (/#\/t\/([^/]+)/.exec(location.hash) || [])[1]);
+await p.evaluate((id) => { location.hash = `#/t/${id}/today`; }, tripId);
+await p.waitForTimeout(500);
+check("it is a screen of its own, with none of the desk on it",
+  (await p.locator(".dayof").count()) === 1
+  && (await p.locator(".stepper, .ribbon, .costbtn").count()) === 0);
+check("one day at a time, numbered like the itinerary",
+  /Day 1 of \d+/.test(await p.textContent(".do-n")), await p.textContent(".do-n"));
+const firstDay = await p.textContent(".do-head");
+await p.locator(".do-nav .do-arrow").last().click();
+await p.waitForTimeout(250);
+check("and the arrow moves you a day", (await p.textContent(".do-head")) !== firstDay);
+await p.locator(".do-nav .do-arrow").first().click();
+await p.waitForTimeout(250);
+check("you cannot go back past the first day",
+  await p.locator(".do-nav .do-arrow").first().isDisabled());
+/* Day 1 of the document is the flight out — there is no bed that night and
+   nothing planned, which is itself correct. Walk on to a day in Rome. */
+for (let n = 0; n < 6 && !/Hotel Artemide/.test(await p.textContent(".dayof")); n++) {
+  await p.locator(".do-nav .do-arrow").last().click();
+  await p.waitForTimeout(200);
+}
+const dayOfText = await p.textContent(".dayof");
+check("it says where you sleep, once, at the top",
+  /TONIGHT/i.test(dayOfText) && /Hotel Artemide/.test(dayOfText), dayOfText.slice(0, 160));
+check("every located line carries a map link and the way there from that bed",
+  (await p.locator(".dayof a.do-btn").count()) >= 2
+  && (await p.locator(".dayof a[href*='/maps/search/']").count()) >= 1
+  && (await p.locator(".dayof a[href*='/maps/dir/']").count()) >= 1);
+check("and nothing on it can be edited by a thumb",
+  (await p.locator(".dayof input, .dayof textarea, .dayof select").count()) === 0);
+await p.click(".do-back");
+await p.waitForTimeout(400);
+check("and it hands you back to the plan",
+  (await p.locator(".dayof").count()) === 0 && (await p.locator(".stepper").count()) === 1);
 
 console.log("\nlocking days");
 check("days step is not done with one day filled in",
