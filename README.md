@@ -178,6 +178,21 @@ for this. Anything spanning whole days (the trip bar, travel points, day ticks,
 the day picker, the rules) uses `wholeDay`; stops and hotel bars use
 `colMid`-to-`colMid`. Hotel bars opt in with `half: true`.
 
+## Maps
+
+Anything that is somewhere carries a pin, and anything that is several
+somewheres carries a route. Day items and hotels get a 📍 that opens Google
+Maps on that place, named and qualified by the city it is in; a day with two or
+more stops gets `route ↗` in its header, walking, from the booked hotel through
+the day in the order it is written; the Cities card gets one route through the
+whole trip; a train or ferry leg gets directions between the two stations, and
+a flight gets its arrival airport.
+
+Nothing new is stored. The links are derived from the titles, addresses and
+cities already in the trip — except that a Google Maps URL pasted into an
+item's or a hotel's link field wins, because a saved pin is the exact place and
+a search is a guess at it. `src/maps.js` holds all of it and is pure.
+
 ## Storage, and the trap that shapes it
 
 ```

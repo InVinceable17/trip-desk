@@ -683,6 +683,17 @@ button.tl-day {
 .segright { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .maplinks { display: flex; gap: 10px; font-family: var(--mono); font-size: 10px; }
 
+/* The map pin. A link, not a button — it opens Maps in its own tab, which on
+   a phone is the Maps app itself. Kept quiet until the row is under the
+   pointer, because on a full day every line carries one. */
+.pin {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 2px; font-size: 12px; line-height: 1;
+  text-decoration: none; opacity: .5; transition: opacity .12s ease, background .12s ease;
+}
+.pin:hover, .pin:focus-visible { opacity: 1; background: var(--accent-soft); }
+.item:hover .pin, .item:focus-within .pin, .tbl tr:hover .pin { opacity: 1; }
+
 .daywhere {
   display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
   padding: 7px 8px; background: var(--sunk); border: 1px solid var(--line-soft); border-radius: 2px;
@@ -1153,6 +1164,11 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   .step.on .step-n { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
   .step-n { width: 22px; height: 22px; }
   .step:active { opacity: .5; }
+
+  /* A pin is a link to somewhere else — at arm's length it needs a fingertip,
+     and it stops hiding, because there is no pointer to reveal it. */
+  .pin { width: 44px; height: 44px; font-size: 18px; opacity: 1; }
+  a.tiny { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; }
 
   /* ---- odds and ends ---- */
   .foot { text-align: center; padding: 4px 0 0; }

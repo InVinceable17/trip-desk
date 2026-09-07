@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { label as dayLabel } from "../flights.js";
-import { segmentSpans, blankStay, STAY_STATUSES, segColor, leadStay, nightsBetween, hotelsIn, mapsSearch, fmtMoney, isTransitStop } from "../model.js";
+import { segmentSpans, blankStay, STAY_STATUSES, segColor, leadStay, nightsBetween, fmtMoney, isTransitStop } from "../model.js";
+import { hotelsIn, mapsSearch, stayUrl } from "../maps.js";
 import { Field, Btn, Card, Amount } from "../components/ui.jsx";
 
 /* Phase 4, deliberately plain. Candidate places per city segment, with
@@ -86,6 +87,13 @@ export default function Stays({ trip, update, readOnly }) {
                           <input className="bare" value={s.name} disabled={readOnly} placeholder="Name"
                             onChange={(e) => setStays((all) => all.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x)))} />
                           {s.url && <a href={s.url} target="_blank" rel="noreferrer" className="tiny">open</a>}
+                          {stayUrl(trip, s) && (
+                            <a className="pin" href={stayUrl(trip, s)} target="_blank" rel="noreferrer"
+                              title={`${s.name || "This hotel"} in Google Maps${s.address ? ` — ${s.address}` : ""}`}
+                              aria-label={`Open ${s.name || "this hotel"} in Google Maps`}>
+                              <span aria-hidden="true">📍</span>
+                            </a>
+                          )}
                         </td>
                         <td className="num">
                           <Amount bare value={s.total} currency={s.currency} disabled={readOnly}

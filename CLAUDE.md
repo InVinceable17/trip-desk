@@ -74,6 +74,51 @@ and a doc you cannot write back in full is half a loop. Additive, so old trips
 still open; `doc-parse.js` reads `Address:` and `Booking confirmation No.:`
 lines and hangs them on the hotel above them.
 
+## One click to the place
+
+`src/maps.js` builds every Google Maps link in the app: a pin on anything that
+is somewhere, a route through anything that is several somewheres. It is its
+own file and not part of `model.js` because it reads the trip back — which city
+a day is spent in, which bed is actually booked — and `model.js` is what
+answers that. The import goes one way only; `mapsSearch` and `hotelsIn` moved
+here for that reason.
+
+**A saved link beats a built one.** `isMapsUrl()` recognises a Google Maps link
+already sitting in an item's or a stay's link field, and the pin then opens
+that instead of searching. A `maps.app.goo.gl` link is the exact pin somebody
+stood on and kept; a search for the title is only ever a guess at it.
+
+**A name without a city is a coin flip.** "Duomo" matches a dozen churches, so
+every query carries the city the day is in — `cityForDay`, which means a day
+trip takes that day's items to Pompeii with it. `placeQuery()` drops a part
+that repeats one already said, because a hotel address usually names its own
+city and an item titled after the city it is in would otherwise search for
+"Capri, Capri".
+
+**Nine waypoints, and Maps drops the tenth in silence.** That is the limit of
+the `/maps/dir/?api=1` scheme. A day longer than that would come back looking
+routed while quietly missing stops, so `directions()` trims and reports
+`dropped`.
+
+**The start of a day is a bed you have booked, in the city you are in.**
+`dayStops()` anchors on the stay only when its status is Booked *and* its city
+is the day's city. An origin you have not committed to is a guess about where
+you will be standing that morning; a bed in the wrong city is worse — on the
+day you move to Florence you wake in Rome, and the walking route the anchor
+produced ran 270km. Both conditions drop the anchor rather than bend the route,
+and a day trip loses it for the same reason. Under two stops there is no route
+at all: the pin on the item already says where it is.
+
+**A flight gets an airport and no turn-by-turn.** `legRoute()` returns null for
+one; Maps will otherwise cheerfully offer thirty hours of driving from Atlanta
+to Rome. The other kinds carry both a mode (train, bus and ferry ride transit;
+a car drives) and a station hint, because "Naples" alone lands you in the
+middle of Naples rather than at Centrale.
+
+**A night in the air is not a stop on the map.** `tripRoute()` runs through
+`cityStops()`, so the same rule that keeps a transit segment out of the Cities
+list keeps it off the route.
+
 ## The doc behind a trip
 
 A trip can be a structured view of a Google Doc somebody else actually writes

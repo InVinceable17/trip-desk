@@ -156,6 +156,9 @@ await p.fill(".tbl.stays tbody tr:first-child td:nth-child(2) input", "1200");
 await p.waitForTimeout(200);
 const perNight = await p.textContent(".tbl.stays tbody tr:first-child td:nth-child(3)");
 check("per-night is derived from the segment's nights", perNight.replace(/\D/g, "") === String(Math.round(1200 / after[0])), { perNight, romeNights: after[0] });
+const stayPin = await p.getAttribute(".tbl.stays tbody tr:first-child a.pin", "href").catch(() => null);
+check("a hotel is one click from the map, named and in its city",
+  !!stayPin && /Hotel Artemide/.test(decodeURIComponent(stayPin)) && /Rome/.test(decodeURIComponent(stayPin)), stayPin);
 
 await p.click(".step:has-text('Days')");
 await p.waitForTimeout(300);
@@ -167,6 +170,25 @@ await p.waitForTimeout(200);
 await p.fill(".day:first-child .item input.bare.grow", "Colosseum");
 await p.waitForTimeout(200);
 check("an unbought ticket surfaces in 'still to book'", /Colosseum/.test(await p.textContent(".todo")), await p.textContent(".todo").catch(() => "no todo"));
+
+/* Every located thing is one tap from Maps, and the query carries the city —
+   "Colosseum" alone is a coin flip, "Colosseum, Rome" is the place. */
+const itemPin = await p.getAttribute(".day:first-child .item a.pin", "href").catch(() => null);
+check("a day item is one click from the map, in the city that day is in",
+  !!itemPin && /\/maps\/search\//.test(itemPin)
+  && /Colosseum/.test(decodeURIComponent(itemPin)) && /Rome/.test(decodeURIComponent(itemPin)), itemPin);
+
+/* Two stops make a walk. One does not — the pin already says where it is. */
+check("one stop is not a route", (await p.locator(".day:first-child .day-head a[href*='/maps/dir/']").count()) === 0);
+await p.click(".day:first-child button:has-text('+ idea')");
+await p.waitForTimeout(150);
+await p.locator(".day:first-child .item input.bare.grow").nth(1).fill("Borghese Gallery");
+await p.waitForTimeout(300);
+const dayRouteHref = await p.getAttribute(".day:first-child .day-head a[href*='/maps/dir/']", "href").catch(() => null);
+check("a second stop turns the day into a walking route through both",
+  !!dayRouteHref && /travelmode=walking/.test(dayRouteHref)
+  && /Colosseum/.test(decodeURIComponent(dayRouteHref))
+  && /Borghese Gallery/.test(decodeURIComponent(dayRouteHref)), dayRouteHref);
 await p.waitForTimeout(300);
 const finalLayers = await layers();
 check("by the last phase the ribbon carries every layer, hotels above cities",

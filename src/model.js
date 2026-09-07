@@ -641,9 +641,9 @@ export function cityMatches(city, code) {
   return true; // unknown airport — don't guess
 }
 
-/** A Google Maps search, for the "find hotels here" link on a stay. */
-export const mapsSearch = (q) => `https://www.google.com/maps/search/${encodeURIComponent(q)}`;
-export const hotelsIn = (city) => (city ? mapsSearch(`hotels in ${city}`) : null);
+/* Map links live in maps.js. They are not here because they need to read the
+   trip back — which city a day is in, which bed is booked — and model.js is
+   what answers that. It cannot import the thing that imports it. */
 
 /* ------------------------------------------------------------------ money */
 

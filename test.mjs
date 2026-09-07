@@ -577,7 +577,7 @@ ok("the seed is a valid trip in its own right", () => {
    locking, reordering, and day trips
    ========================================================================== */
 console.log("\nlocking a city's dates");
-import { moveSegment, citiesLocked, dayTrips, hotelsIn, mapsSearch, blankDay } from "./src/model.js";
+import { moveSegment, citiesLocked, dayTrips, blankDay } from "./src/model.js";
 
 ok("a locked city won't give up nights to its neighbour", () => {
   const segs = [
@@ -671,6 +671,11 @@ ok("a day trip doesn't disturb the stay for that segment", () => {
 });
 
 console.log("\nmaps links");
+import {
+  hotelsIn, mapsSearch, placeQuery, placeUrl, isMapsUrl, directions, MAX_WAYPOINTS,
+  itemUrl, stayUrl, legPlaceUrl, legRoute, dayStops, dayRoute, tripRoute,
+} from "./src/maps.js";
+
 ok("builds a hotel search for a city", () => {
   assert.equal(hotelsIn("Rome"), "https://www.google.com/maps/search/hotels%20in%20Rome");
 });
@@ -680,6 +685,179 @@ ok("escapes a two-word city", () => {
 ok("no link without a city", () => assert.equal(hotelsIn(""), null));
 ok("plain search for anywhere else", () => {
   assert.match(mapsSearch("things to do in Capri"), /things%20to%20do%20in%20Capri/);
+});
+
+/* A query is a name plus enough to find it. */
+ok("a place carries the city it is in", () => {
+  assert.equal(placeQuery("Duomo", "Florence"), "Duomo, Florence");
+});
+ok("but never says the city twice", () => {
+  assert.equal(placeQuery("Capri", "Capri"), "Capri");
+  assert.equal(placeQuery("Hotel Artemide", "Via Nazionale 22, Rome", "Rome"),
+    "Hotel Artemide, Via Nazionale 22, Rome");
+});
+ok("blank parts drop out, and nothing at all is no link", () => {
+  assert.equal(placeQuery("", "  ", null), "");
+  assert.equal(placeUrl("", null), null);
+});
+
+/* A link somebody saved is the exact pin; a title is only a guess at it. */
+ok("knows a Google Maps link when it sees one", () => {
+  assert.ok(isMapsUrl("https://www.google.com/maps/place/Colosseum"));
+  assert.ok(isMapsUrl("https://maps.app.goo.gl/abc123"));
+  assert.ok(isMapsUrl("https://goo.gl/maps/abc123"));
+  assert.ok(isMapsUrl("https://maps.google.it/?q=Roma"));
+  assert.ok(isMapsUrl("https://www.google.co.uk/maps/@41.9,12.5,15z"));
+});
+ok("and is not fooled by a lookalike", () => {
+  assert.equal(isMapsUrl("https://notgoogle.com/maps/place/X"), false);
+  assert.equal(isMapsUrl("https://booking.com/hotel"), false);
+  assert.equal(isMapsUrl(""), false);
+});
+
+console.log("\nmaps routes");
+ok("one stop is not a route", () => {
+  assert.equal(directions(["Rome"]), null);
+  assert.equal(directions([]), null);
+});
+ok("two stops are origin and destination, no waypoints", () => {
+  const r = directions(["Rome", "Florence"]);
+  assert.match(r.url, /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&/);
+  assert.match(r.url, /origin=Rome&destination=Florence/);
+  assert.ok(!/waypoints/.test(r.url));
+  assert.equal(r.dropped, 0);
+});
+ok("the middle stops become waypoints, in order", () => {
+  const r = directions(["A", "B", "C", "D"], "walking");
+  assert.match(r.url, /origin=A/);
+  assert.match(r.url, /destination=D/);
+  assert.match(decodeURIComponent(r.url), /waypoints=B\|C/);
+  assert.match(r.url, /travelmode=walking/);
+});
+ok("a longer day is trimmed to what the URL takes, and says what it lost", () => {
+  const many = Array.from({ length: MAX_WAYPOINTS + 4 }, (_, i) => `s${i}`);
+  const r = directions(["start", ...many, "end"]);
+  const wp = decodeURIComponent(r.url).split("waypoints=")[1].split("&")[0].split("|");
+  assert.equal(wp.length, MAX_WAYPOINTS);
+  assert.equal(r.dropped, 4);
+});
+
+/* --------------------------------------------------------- on a real trip */
+const mapTrip = () => {
+  const t = lockedTrip();
+  t.stays = [
+    { ...blankStay("s1"), name: "Hotel Artemide", address: "Via Nazionale 22", status: "Booked" },
+  ];
+  t.days = {
+    "2026-10-13": { ...blankDay(), items: [
+      { ...blankItem("idea"), title: "Colosseum" },
+      { ...blankItem("ticket"), title: "Borghese Gallery" },
+    ] },
+  };
+  return t;
+};
+
+ok("an item links to itself, in the city that day is in", () => {
+  const t = mapTrip();
+  assert.equal(decodeURIComponent(itemUrl(t, "2026-10-13", t.days["2026-10-13"].items[0])),
+    "https://www.google.com/maps/search/Colosseum, Rome");
+});
+ok("a day trip takes the day's items with it", () => {
+  const t = mapTrip();
+  t.days["2026-10-13"].city = "Pompeii";
+  assert.match(decodeURIComponent(itemUrl(t, "2026-10-13", t.days["2026-10-13"].items[0])),
+    /Colosseum, Pompeii/);
+});
+ok("a saved maps link beats the guess", () => {
+  const t = mapTrip();
+  const it = { ...blankItem("idea"), title: "that place", url: "https://maps.app.goo.gl/xyz" };
+  assert.equal(itemUrl(t, "2026-10-13", it), "https://maps.app.goo.gl/xyz");
+});
+ok("an ordinary link does not", () => {
+  const t = mapTrip();
+  const it = { ...blankItem("ticket"), title: "Uffizi", url: "https://tickets.example/uffizi" };
+  assert.match(itemUrl(t, "2026-10-13", it), /Uffizi/);
+});
+ok("an item with no title is not a place yet", () => {
+  const t = mapTrip();
+  assert.equal(itemUrl(t, "2026-10-13", blankItem("idea")), null);
+});
+
+ok("a hotel links by its address", () => {
+  const t = mapTrip();
+  assert.equal(decodeURIComponent(stayUrl(t, t.stays[0])),
+    "https://www.google.com/maps/search/Hotel Artemide, Via Nazionale 22, Rome");
+});
+ok("and by name alone before anyone has typed one", () => {
+  const t = mapTrip();
+  assert.match(decodeURIComponent(stayUrl(t, { ...t.stays[0], address: "" })), /Hotel Artemide, Rome/);
+});
+ok("an empty row has nothing to point at", () => {
+  const t = mapTrip();
+  assert.equal(stayUrl(t, blankStay("s1")), null);
+});
+
+ok("a train leg wants the station, not the middle of town", () => {
+  const leg = { ...blankTravel("train"), from: "Rome", to: "Florence" };
+  assert.match(decodeURIComponent(legPlaceUrl(leg, "to")), /Florence train station/);
+  const r = legRoute(leg);
+  assert.match(decodeURIComponent(r.url), /origin=Rome train station/);
+  assert.match(r.url, /travelmode=transit/);
+});
+ok("a car leg is driven and needs no station", () => {
+  const leg = { ...blankTravel("car"), from: "Siena", to: "Florence" };
+  assert.equal(decodeURIComponent(legPlaceUrl(leg, "to")), "https://www.google.com/maps/search/Florence");
+  assert.match(legRoute(leg).url, /travelmode=driving/);
+});
+ok("a flight gets the airport and no turn-by-turn", () => {
+  const leg = { kind: "flight", from: "ATL", to: "FCO" };
+  assert.match(decodeURIComponent(legPlaceUrl(leg, "to")), /FCO airport/);
+  assert.equal(legRoute(leg), null);
+});
+
+ok("a day routes from the booked bed through the day's stops", () => {
+  const t = mapTrip();
+  assert.deepEqual(dayStops(t, "2026-10-13"),
+    ["Hotel Artemide, Via Nazionale 22, Rome", "Colosseum, Rome", "Borghese Gallery, Rome"]);
+  assert.match(dayRoute(t, "2026-10-13").url, /travelmode=walking/);
+});
+ok("a bed nobody has booked is not an origin", () => {
+  const t = mapTrip();
+  t.stays[0].status = "Shortlist";
+  assert.deepEqual(dayStops(t, "2026-10-13"), ["Colosseum, Rome", "Borghese Gallery, Rome"]);
+});
+ok("nor is last night's bed in the city you just left", () => {
+  const t = mapTrip();
+  // Oct 16 you wake in Rome and sleep in Florence; the walk is in Florence.
+  t.days["2026-10-16"] = { ...blankDay(), items: [{ ...blankItem("ticket"), title: "Uffizi" }] };
+  assert.deepEqual(dayStops(t, "2026-10-16"), ["Uffizi, Florence"]);
+});
+ok("nor a bed in the city you are not spending the day in", () => {
+  const t = mapTrip();
+  t.days["2026-10-13"].city = "Pompeii";
+  assert.deepEqual(dayStops(t, "2026-10-13"), ["Colosseum, Pompeii", "Borghese Gallery, Pompeii"]);
+});
+ok("one stop is not a day route", () => {
+  const t = mapTrip();
+  t.stays = [];
+  t.days["2026-10-13"].items = [{ ...blankItem("idea"), title: "Colosseum" }];
+  assert.equal(dayRoute(t, "2026-10-13"), null);
+  assert.equal(dayRoute(t, "2026-10-15"), null);
+});
+
+ok("the trip routes through its cities in order", () => {
+  const r = tripRoute(mapTrip());
+  assert.match(decodeURIComponent(r.url), /origin=Rome&destination=Naples&waypoints=Florence/);
+});
+ok("a night in the air is not a stop on the map", () => {
+  const t = mapTrip();
+  t.segments = [{ ...blankTransit(1) }, ...t.segments];
+  assert.deepEqual(tripRoute(t).stops, ["Rome", "Florence", "Naples"]);
+});
+ok("one city is not a route", () => {
+  const t = mapTrip();
+  t.segments = [t.segments[0]];
+  assert.equal(tripRoute(t), null);
 });
 
 

@@ -5,6 +5,7 @@ import {
   addSegment, moveSegment, segColor, bookedFlight,
   cityPlan, setDayTrip, isTransitStop, transitGap, addTransit,
 } from "../model.js";
+import { mapsSearch, tripRoute } from "../maps.js";
 import { Btn, Card } from "../components/ui.jsx";
 
 /* Phase 3. Ordered city segments, laid on the ribbon and draggable there.
@@ -32,6 +33,8 @@ export default function Cities({ trip, update, readOnly }) {
   /* Counts are about places you are going, so a night under way is not one. */
   const cities = (trip.segments || []).filter((s) => !isTransitStop(trip, s));
   const cityCount = cities.length;
+  /* The trip drawn on one map: the cities in order, nights in the air left out. */
+  const route = tripRoute(trip);
 
   const setSegments = (next) =>
     update((t) => ({ ...t, segments: typeof next === "function" ? next(t.segments) : next }));
@@ -143,6 +146,11 @@ export default function Cities({ trip, update, readOnly }) {
 
         <div className="grow" />
 
+        {!transit && s.city.trim() && (
+          <a className="tiny" href={mapsSearch(s.city)} target="_blank" rel="noreferrer"
+            title={`${s.city} in Google Maps`}>map ↗</a>
+        )}
+
         {/* There is no day trip out of a plane. */}
         <Btn className="sm" disabled={readOnly || !span || transit}
           onClick={() => { setTripFor(s.id); setTripDate(daysFor(s.id)[0] || ""); setTripCity(""); setAdding(false); }}>
@@ -171,10 +179,18 @@ export default function Cities({ trip, update, readOnly }) {
         title="Cities"
         accent
         right={
-          <span className={`nightcount${got === total && total ? " ok" : ""}`}>
-            <b>{got}</b> of <b>{total}</b> nights
-            {cityCount > 0 && (
-              <> · <b>{cities.filter((s) => s.locked).length}</b> of <b>{cityCount}</b> locked</>
+          <span className="segright">
+            <span className={`nightcount${got === total && total ? " ok" : ""}`}>
+              <b>{got}</b> of <b>{total}</b> nights
+              {cityCount > 0 && (
+                <> · <b>{cities.filter((s) => s.locked).length}</b> of <b>{cityCount}</b> locked</>
+              )}
+            </span>
+            {route && (
+              <span className="maplinks">
+                <a href={route.url} target="_blank" rel="noreferrer"
+                  title={`The whole route in Google Maps — ${route.stops.join(" → ")}`}>route ↗</a>
+              </span>
             )}
           </span>
         }
@@ -237,6 +253,8 @@ export default function Cities({ trip, update, readOnly }) {
                   <span className="segdates"><span className="dpair"><i>On</i> {dayLabel(row.iso)}</span>
                     <span className="muted">out of {row.base}</span></span>
                   <div className="grow" />
+                  <a className="tiny" href={mapsSearch(row.city)} target="_blank" rel="noreferrer"
+                    title={`${row.city} in Google Maps`}>map ↗</a>
                   <Btn className="sm" kind="danger" disabled={readOnly}
                     onClick={() => update((t) => setDayTrip(t, row.iso, ""))}
                     aria-label={`Remove the day trip to ${row.city}`}>×</Btn>

@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { label as dayLabel, dayOf, DOW } from "../flights.js";
 import {
   tripDays, cityForDay, blankItem, blankDay, ITEM_KINDS, openBookings,
-  segmentSpans, mapsSearch, lockedDayCount, dayStay, travelOn, KIND_GLYPH, fmtMoney,
+  segmentSpans, lockedDayCount, dayStay, travelOn, KIND_GLYPH, fmtMoney,
 } from "../model.js";
+import { mapsSearch, itemUrl, dayRoute } from "../maps.js";
 import { Btn, Card, Amount } from "../components/ui.jsx";
 
 /* Phase 5. Every day open by default and notes that grow as you type, so the
@@ -30,6 +31,15 @@ function Notes({ value, onChange, disabled, placeholder }) {
     />
   );
 }
+
+/* One tap to the place. The pin is a link and not a button on purpose: it
+   opens Maps in its own tab, and on a phone that is the Maps app. */
+const ItemPin = ({ url, title }) => (url ? (
+  <a className="pin" href={url} target="_blank" rel="noreferrer"
+    title={`${title || "This"} in Google Maps`} aria-label={`Open ${title || "this"} in Google Maps`}>
+    <span aria-hidden="true">📍</span>
+  </a>
+) : null);
 
 export default function Days({ trip, update, readOnly }) {
   const days = tripDays(trip);
@@ -88,6 +98,7 @@ export default function Days({ trip, update, readOnly }) {
                 <span className={`chip k-${it.kind}`}>{KIND_LABEL[it.kind]}</span>
                 <span className="todo-title">{it.title || "untitled"}</span>
                 {it.cost && <span className="num muted">{fmtMoney(it.cost, it.currency)}</span>}
+                <ItemPin url={itemUrl(trip, it.date, it)} title={it.title} />
                 {it.url && <a href={it.url} target="_blank" rel="noreferrer">open</a>}
                 <div className="grow" />
                 <Btn className="sm" disabled={readOnly} onClick={() => setDay(it.date, (d) => ({
@@ -109,6 +120,7 @@ export default function Days({ trip, update, readOnly }) {
           const last = i === days.length - 1;
           const editing = tripOpen.has(iso) || !!d.city;
           const locked = !!d.locked;
+          const route = dayRoute(trip, iso);
 
           return (
             <section key={iso} className={`day${open ? " open" : ""}${locked ? " locked" : ""}${st.moves ? " travel" : ""}`}
@@ -174,6 +186,10 @@ export default function Days({ trip, update, readOnly }) {
                 {last && <span className="chip">depart</span>}
 
                 <div className="grow" />
+                {route && (
+                  <a className="tiny nostretch" href={route.url} target="_blank" rel="noreferrer"
+                    title={`Walk the day in Google Maps — ${route.stops.join(" → ")}`}>route ↗</a>
+                )}
                 {where && where.city && (
                   <a className="tiny nostretch" href={mapsSearch(`things to do in ${where.city}`)} target="_blank" rel="noreferrer">maps ↗</a>
                 )}
@@ -211,6 +227,7 @@ export default function Days({ trip, update, readOnly }) {
                         onChange={({ value, currency }) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, cost: value, currency } : y)) }))} />
                       <input className="bare url" value={it.url} disabled={readOnly || locked} placeholder="link"
                         onChange={(e) => setDay(iso, (x) => ({ ...x, items: x.items.map((y) => (y.id === it.id ? { ...y, url: e.target.value } : y)) }))} />
+                      <ItemPin url={itemUrl(trip, iso, it)} title={it.title} />
                       {it.url && <a href={it.url} target="_blank" rel="noreferrer" className="tiny">↗</a>}
                       <Btn className="sm" kind="danger" disabled={readOnly || locked}
                         onClick={() => setDay(iso, (x) => ({ ...x, items: x.items.filter((y) => y.id !== it.id) }))}>×</Btn>
