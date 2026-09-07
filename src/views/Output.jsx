@@ -21,6 +21,11 @@ import { Btn } from "../components/ui.jsx";
    renders during App's render, and every edit goes through updateTrip — so a
    keystroke and the line it rewrites happen in the same paint. Nothing is
    cached and there is nothing to invalidate.
+
+   Every line that is somewhere carries a pin, and a day with a walk in it
+   carries the walk on its heading. They are properties of the block rather
+   than of its text, so they show here and stay out of what Copy puts on the
+   clipboard: the document is what she wrote, and the pins are how you read it.
    ========================================================================== */
 
 export default function Output({ trip, open, onClose }) {
@@ -76,12 +81,26 @@ export default function Output({ trip, open, onClose }) {
               {bs.map((b, i) => {
                 if (b.kind === "title") return <h1 key={i} className="sd-title">{b.text}</h1>;
                 if (b.kind === "range") return <p key={i} className="sd-range">{b.text}</p>;
-                if (b.kind === "day") return <h2 key={i} className="sd-day">{b.text}</h2>;
+                if (b.kind === "day") return (
+                  <h2 key={i} className="sd-day">
+                    {b.text}
+                    {b.map && (
+                      <a className="sd-walk" href={b.map} target="_blank" rel="noreferrer"
+                        title="Walk this day in Google Maps">route ↗</a>
+                    )}
+                  </h2>
+                );
                 return (
                   <p key={i} className={`sd-b${b.depth ? " sub" : ""}`}>
                     {pieces(b.text).map((x, j) => (x.url
                       ? <a key={j} href={x.url} target="_blank" rel="noreferrer">{x.text}</a>
                       : <span key={j}>{x.text}</span>))}
+                    {b.map && (
+                      <a className="pin" href={b.map} target="_blank" rel="noreferrer"
+                        title={`${b.text} in Google Maps`} aria-label={`Open ${b.text} in Google Maps`}>
+                        <span aria-hidden="true">📍</span>
+                      </a>
+                    )}
                   </p>
                 );
               })}

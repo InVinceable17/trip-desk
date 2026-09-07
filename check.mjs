@@ -232,6 +232,29 @@ check("it renders the doc's own day headings", await p.evaluate(
 check("there is no backdrop, so the app underneath stays usable",
   (await p.locator(".docdrawer ~ .backdrop, .sheet").count()) === 0);
 
+/* The pins are on the blocks, not in the text. So the drawer shows them and
+   the copy that pastes into her document does not. */
+check("every line that is somewhere carries a pin",
+  (await p.locator(".docdrawer .sd-b a.pin").count()) > 0);
+check("and the pin points at what the line names", await p.evaluate(() => {
+  const line = [...document.querySelectorAll(".docdrawer .sd-b")]
+    .find((b) => /Colosseum/.test(b.textContent));
+  const a = line && line.querySelector("a.pin");
+  return !!a && /\/maps\/search\//.test(a.href) && /Colosseum/.test(decodeURIComponent(a.href));
+}));
+check("a day with two stops carries its walk on the heading", await p.evaluate(() => {
+  const under = (h) => {
+    let n = h.nextElementSibling, txt = "";
+    while (n && n.classList.contains("sd-b")) { txt += n.textContent; n = n.nextElementSibling; }
+    return txt;
+  };
+  const h = [...document.querySelectorAll(".docdrawer .sd-day")].find((x) => /Colosseum/.test(under(x)));
+  const a = h && h.querySelector("a.sd-walk");
+  return !!a && /maps\/dir\/\?api=1/.test(a.href) && /travelmode=walking/.test(a.href);
+}));
+check("but the document's own text has no map links in it — that is what pastes back",
+  !/google\.com\/maps/.test(await p.textContent(".docdrawer .sheet-doc")));
+
 /* The claim under test: no caching, no refresh, no invalidation. */
 const dayLine = () => p.evaluate(() => {
   const heads = [...document.querySelectorAll(".docdrawer .sd-day")];

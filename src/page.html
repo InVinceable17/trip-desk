@@ -910,12 +910,26 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
 .sd-b.sub::before { left: 30px; content: "\25E6"; }
 .sd-b a { color: var(--accent-ink); }
 
+/* The pins are not part of the document, so they do not read as part of it:
+   quiet until the line is under the pointer, and never in what prints. */
+.sheet-doc .pin { opacity: .45; vertical-align: baseline; margin-left: 2px; }
+.sd-b:hover .pin, .sheet-doc .pin:focus-visible { opacity: 1; }
+.sd-walk {
+  margin-left: 10px; font-family: var(--mono); font-size: 10px; font-weight: 400;
+  letter-spacing: 0; text-transform: none; color: var(--accent-ink);
+  opacity: .45; transition: opacity .12s ease;
+}
+.sd-day:hover .sd-walk, .sd-walk:focus-visible { opacity: 1; }
+
 @media (max-width: 768px) {
   .sheet-doc { padding: 22px 20px 28px; font-size: 16px; border-radius: 12px; }
   .sd-b { padding-left: 18px; }
   .sd-b::before { left: 4px; }
   .sd-b.sub { padding-left: 34px; }
   .sd-b.sub::before { left: 20px; }
+  /* No pointer to hover with, and a fingertip to hit it with. */
+  .sheet-doc .pin { opacity: 1; width: 44px; height: 44px; }
+  .sd-walk { opacity: 1; font-size: 12px; }
 }
 
 @media print {
@@ -924,6 +938,8 @@ input.bare.code { width: 90px; flex: 0 0 auto; }
   .sheet-doc { border: 0; box-shadow: none; max-width: none; padding: 0; }
   .sd-day { break-after: avoid; }
   .sd-b { break-inside: avoid; }
+  /* Printed, the document is the document — a pin on paper links to nothing. */
+  .sheet-doc .pin, .sd-walk { display: none !important; }
 }
 
 

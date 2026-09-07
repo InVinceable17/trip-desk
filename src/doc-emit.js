@@ -28,6 +28,15 @@
    Pure: no DOM, no network. `blocks()` is the structure, `text()` is the
    string, and the view renders the former while the clipboard takes the
    latter — one description, two outputs, so they cannot drift.
+
+   A bullet may also carry a `map`: the Google Maps link for whatever that line
+   names. It is a property of the block and not of its text, which is the whole
+   point — the drawer hangs a pin off the line, and `text()` never serialises
+   it. A map link is derived from the trip, not written by anyone, so pasting
+   one into her doc would be the app writing its own working into her document;
+   and the parser reading it back would take the maps URL for the line's link
+   and "[map]" for part of its title. The document says where you are going.
+   The pin is how you read it.
    ========================================================================== */
 
 import { dayOf, toUTC, fromUTC, range, ISO } from "./flights.js";
@@ -35,6 +44,7 @@ import {
   tripDays, segmentSpans, cityForDay, dayStay, travelOn, travelLegs, leadStay,
   nightsBetween, fmtMoney,
 } from "./model.js";
+import { mapsSearch, itemUrl, stayUrl, legPlaceUrl, dayRoute } from "./maps.js";
 
 /* Her abbreviations, not the standard ones: TUES and THUR, not TUE and THU.
    Matching the doc matters more than matching a convention. */
@@ -116,21 +126,29 @@ export function docDays(trip) {
   return range(sorted[0], sorted[sorted.length - 1]);
 }
 
-/** Movement on a day, split across days the way an overnight flight really is. */
+/**
+ * Movement on a day, split across days the way an overnight flight really is.
+ *
+ * The pin on a travel line is the end of the leg it names, not the city the
+ * sentence does: "Arrive in Rome" is where you are going, but FCO is where the
+ * plane puts you down and the only one of the two you need directions from.
+ */
 function travelLines(trip, iso, prevIso) {
   const out = [];
 
   travelOn(trip, iso).forEach((L) => {
     if (L.kind === "flight") {
       const at = L.depart ? ` at ${to12h(L.depart)}` : "";
-      out.push(`Depart ${L.from}${at}`);
+      out.push({ text: `Depart ${L.from}${at}`, map: legPlaceUrl(L, "from") });
       /* A same-day flight lands on the day it left; a +1 lands tomorrow, and
          is emitted there instead — see the prevIso pass below. */
-      if (!L.plusOne && L.arrive) out.push(`Arrive in ${arrivalPlace(trip, L, iso)} at ${to12h(L.arrive)}`);
+      if (!L.plusOne && L.arrive) {
+        out.push({ text: `Arrive in ${arrivalPlace(trip, L, iso)} at ${to12h(L.arrive)}`, map: legPlaceUrl(L, "to") });
+      }
     } else {
       const mode = { train: "Train", ferry: "Ferry", car: "Drive", bus: "Bus", transfer: "Transfer" }[L.kind] || "Travel";
       const at = L.depart ? ` at ${to12h(L.depart)}` : "";
-      out.push(`${mode} to ${L.to || arrivalPlace(trip, L, iso)}${at}`);
+      out.push({ text: `${mode} to ${L.to || arrivalPlace(trip, L, iso)}${at}`, map: legPlaceUrl(L, "to") });
     }
   });
 
@@ -138,7 +156,7 @@ function travelLines(trip, iso, prevIso) {
   if (prevIso) {
     travelOn(trip, prevIso).forEach((L) => {
       if (L.kind === "flight" && L.plusOne && L.arrive) {
-        out.push(`Arrive in ${arrivalPlace(trip, L, iso)} at ${to12h(L.arrive)}`);
+        out.push({ text: `Arrive in ${arrivalPlace(trip, L, iso)} at ${to12h(L.arrive)}`, map: legPlaceUrl(L, "to") });
       }
     });
   }
@@ -156,20 +174,23 @@ function travelLines(trip, iso, prevIso) {
 function placeLine(trip, iso, notesHead) {
   const st = dayStay(trip, iso);
   const base = (st && st.sleep) || "";
-  if (!base) return "";
+  if (!base) return null;
 
   const where = cityForDay(trip, iso);
+  /* The pin is the place the line puts you: on a day trip that is where you
+     went, not the city you came back to sleep in. */
+  const map = mapsSearch((where && where.city) || base);
   const out = where && where.city && where.city !== base ? `Day trip to ${where.city}` : "";
   /* A short single-line note reads as the day's theme and belongs on the same
      line — "Rome - Ancient Rome". Anything longer stands on its own. */
   const tail = out || notesHead;
-  if (!tail) return base;
+  if (!tail) return { text: base, map };
   /* The city is prefixed even when the note repeats it — "Florence -
      Renaissance Day in Florence" is clumsy, but the doc's own dominant form is
      "Rome - Ancient Rome", and dropping the prefix whenever the note happened
      to contain the city name would silently strip it from that one too. A
      consistent line beats a clever one. */
-  return `${base} - ${tail}`;
+  return { text: `${base} - ${tail}`, map };
 }
 
 /** The nested hotel block, on the day you check in. */
@@ -179,7 +200,9 @@ function hotelBlock(trip, iso) {
   const stay = leadStay(trip, span.seg.id);
   if (!stay || !stay.name) return [];
 
-  const out = [{ depth: 1, text: `Hotel: ${mdLink(stay.name, stay.url)}` }];
+  /* One pin for the hotel, on the line that names it — the address line below
+     it is the same building, and two pins on one block is just noise. */
+  const out = [{ depth: 1, text: `Hotel: ${mdLink(stay.name, stay.url)}`, map: stayUrl(trip, stay) }];
   if (stay.address) out.push({ depth: 1, text: `Address: ${stay.address}` });
   if (stay.ref) {
     const nights = nightsBetween(span.startDate, span.endDate);
@@ -194,7 +217,7 @@ function hotelBlock(trip, iso) {
 }
 
 /** A day's own items, as bullets: "8:30AM Entry into Academia Gallery". */
-function itemLines(day) {
+function itemLines(trip, iso, day) {
   return (day.items || [])
     .filter((it) => (it.title || "").trim() || it.url)
     .map((it) => {
@@ -203,7 +226,8 @@ function itemLines(day) {
       bits.push(it.url && it.title ? mdLink(it.title, it.url) : (it.title || it.url));
       const line = bits.join(" ");
       /* The doc writes money with its symbol — "($73)", not "(73)". */
-      return it.cost ? `${line} (${fmtMoney(it.cost, it.currency)})` : line;
+      const text = it.cost ? `${line} (${fmtMoney(it.cost, it.currency)})` : line;
+      return { text, map: itemUrl(trip, iso, it) };
     });
 }
 
@@ -211,9 +235,11 @@ function itemLines(day) {
 
 /**
  * The itinerary as a list of blocks. `kind` is "title" | "range" | "day" |
- * "bullet"; bullets carry a `depth` of 0 or 1. The view renders these; text()
- * serialises them. Deriving both from one description is the point — a
- * preview that disagrees with what you paste is worse than no preview.
+ * "bullet"; bullets carry a `depth` of 0 or 1, and anything that is somewhere
+ * carries a `map`. The view renders these; text() serialises them. Deriving
+ * both from one description is the point — a preview that disagrees with what
+ * you paste is worse than no preview — and `map` is the one field the text
+ * side deliberately drops, because it is not something the doc says.
  */
 export function blocks(trip) {
   const days = docDays(trip);
@@ -236,7 +262,10 @@ export function blocks(trip) {
   }
 
   days.forEach((iso, i) => {
-    out.push({ kind: "day", text: `DAY ${i + 1} - ${headDay(iso)}`, iso });
+    /* The heading carries the day's walk, when the day has one — the one link
+       on the page that is about the day rather than about a line of it. */
+    const walk = dayRoute(trip, iso);
+    out.push({ kind: "day", text: `DAY ${i + 1} - ${headDay(iso)}`, iso, map: walk ? walk.url : "" });
 
     const day = (trip.days || {})[iso] || {};
     const noteLines = (day.notes || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
@@ -247,15 +276,15 @@ export function blocks(trip) {
       && !(where && where.city && where.city !== where.base);
     const head = foldable ? noteLines[0] : "";
 
-    travelLines(trip, iso, i > 0 ? days[i - 1] : "").forEach((t) => out.push({ kind: "bullet", depth: 0, text: t }));
+    travelLines(trip, iso, i > 0 ? days[i - 1] : "").forEach((b) => out.push({ kind: "bullet", depth: 0, ...b }));
 
     const place = placeLine(trip, iso, head);
-    if (place) out.push({ kind: "bullet", depth: 0, text: place });
+    if (place) out.push({ kind: "bullet", depth: 0, ...place });
 
     hotelBlock(trip, iso).forEach((b) => out.push({ kind: "bullet", ...b }));
 
     if (!foldable) noteLines.forEach((n) => out.push({ kind: "bullet", depth: 0, text: n }));
-    itemLines(day).forEach((t) => out.push({ kind: "bullet", depth: 0, text: t }));
+    itemLines(trip, iso, day).forEach((b) => out.push({ kind: "bullet", depth: 0, ...b }));
   });
 
   return out;
@@ -265,6 +294,9 @@ export function blocks(trip) {
  * The blocks as the plain text that goes on the clipboard. The spacing is the
  * doc's own: one blank line before DAY 1, two between days, and one under a
  * heading only when something actually follows it.
+ *
+ * Only `text` is read here. A block's `map` is the app's own working, not a
+ * line of her document, and this is what pastes over the top of it.
  */
 export function text(trip) {
   const bs = blocks(trip);

@@ -53,6 +53,21 @@ copied from the real doc — `DAY 1 - SAT OCTOBER 10`, asterisk bullets, hotels
 indented three spaces beneath — including the abbreviations `TUES` and `THUR`,
 which are hers and not the standard ones.
 
+**A pin is on the block, never in the text.** Every emitted bullet that names
+somewhere carries a `map`, and a day with a walk in it carries the route on its
+heading — `blocks()` builds them, `Output.jsx` renders them, and `text()`
+deliberately drops the field. The clipboard is what pastes over the top of her
+document, and a map link is the app's own working, not a line she wrote. It
+would also not survive the round trip: `doc-parse` takes the first URL on a
+bullet as the item's link and leaves the rest in the title, so a trailing
+`[map](…)` would come back as `Lunch near Monti [map]()` with a maps URL where
+the ticket link belongs. A test asserts `emitText` contains no `google.com/maps`.
+
+**The pin says where the plane lands, not where the sentence says you are.**
+"Arrive in Rome" is right for the document — you are going to Rome — but the
+useful link on that line is FCO, which is where you are standing when you need
+it.
+
 **The document is longer than the trip.** `trip.dates` is when you are *there*;
 the doc counts DAY 1 from when you *leave*, and an overnight flight departs the
 day before. `docDays()` spans the earliest thing that happens to the latest and

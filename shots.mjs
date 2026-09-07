@@ -77,5 +77,16 @@ await shot("phone-cities", "#/t/t1/cities", "light", 390);
   await p.screenshot({ path: "shot-cost.png", fullPage: true });
   await p.close();
 }
+/* The drawer is only ever open by hand, so it needs its own pass. */
+{
+  const p = await b.newPage({ viewport: { width: 1440, height: 1100 }, colorScheme: "light" });
+  await p.addInitScript(() => { window.claude = { use: async () => null }; });
+  await p.goto("http://localhost:8811/#/t/t1/days", { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  await p.click(".link:has-text('itinerary')");
+  await p.waitForTimeout(500);
+  await p.screenshot({ path: "shot-drawer.png", fullPage: true });
+  await p.close();
+}
 console.log(errs.length ? "ERRORS:\n" + errs.join("\n") : "no errors");
 await b.close(); server.close();

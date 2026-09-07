@@ -188,6 +188,12 @@ the day in the order it is written; the Cities card gets one route through the
 whole trip; a train or ferry leg gets directions between the two stations, and
 a flight gets its arrival airport.
 
+The itinerary drawer carries them too: every line that names somewhere gets a
+pin, and a day with a walk in it gets the route on its heading. Those live on
+the block rather than in its text, so **Copy** still puts the plain document on
+the clipboard — a map link is derived, and pasting it back into the planning
+doc would be the app writing its own working into somebody else's document.
+
 Nothing new is stored. The links are derived from the titles, addresses and
 cities already in the trip — except that a Google Maps URL pasted into an
 item's or a hotel's link field wins, because a saved pin is the exact place and

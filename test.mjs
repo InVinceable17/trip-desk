@@ -1461,6 +1461,53 @@ ok("what it writes, the parser reads back", () => {
   assert.equal(hotel.ref, "2026082251320670");
   assert.ok(Object.keys(parsed.days).length > 0, "expected day headings to survive");
 });
+/* The pins are on the blocks and not in the text. That split is the whole
+   design: the drawer is something you read, the clipboard is something that
+   goes into her document, and a derived link belongs in only one of them. */
+ok("every line that is somewhere carries its map link", () => {
+  const t = docTrip();
+  t.days = { "2026-10-13": { ...blankDay(), items: [{ ...blankItem("ticket"), title: "Colosseum" }] } };
+  const bs = emitBlocks(t);
+  const find = (re) => bs.find((b) => re.test(b.text));
+
+  assert.match(decodeURIComponent(find(/^Depart ATL/).map), /ATL airport/);
+  /* The line names the city, the pin names the airport — it is the plane that
+     puts you down, and FCO is the one of the two you need directions from. */
+  assert.match(decodeURIComponent(find(/^Arrive in Rome/).map), /FCO airport/);
+  assert.match(decodeURIComponent(find(/^Hotel:/).map), /Hotel Lancelot, Via Capo D'Africa, 47, Roma/);
+  assert.match(decodeURIComponent(find(/^Colosseum/).map), /Colosseum, Rome/);
+  assert.match(decodeURIComponent(find(/^Rome$/).map), /search\/Rome/);
+});
+ok("a day trip's line points where you went, not where you slept", () => {
+  const t = docTrip();
+  t.days = { "2026-10-13": { ...blankDay(), city: "Pompeii" } };
+  const line = emitBlocks(t).find((b) => /^Rome - Day trip to Pompeii$/.test(b.text));
+  assert.ok(line, "expected the day-trip place line");
+  assert.match(decodeURIComponent(line.map), /search\/Pompeii/);
+});
+ok("a day with two stops carries the walk on its heading", () => {
+  const t = docTrip();
+  t.days = { "2026-10-13": { ...blankDay(), items: [
+    { ...blankItem("idea"), title: "Colosseum" },
+    { ...blankItem("idea"), title: "Palatine Hill" },
+  ] } };
+  const heads = emitBlocks(t).filter((b) => b.kind === "day");
+  const walk = heads.find((b) => /OCTOBER 13$/.test(b.text));
+  assert.match(walk.map, /maps\/dir\/\?api=1/);
+  assert.match(walk.map, /travelmode=walking/);
+  // A day nobody has planned has no walk to offer.
+  assert.equal(heads.find((b) => /OCTOBER 15$/.test(b.text)).map, "");
+});
+ok("but none of it reaches the clipboard, which is her document", () => {
+  const t = docTrip();
+  t.days = { "2026-10-13": { ...blankDay(), items: [{ ...blankItem("ticket"), title: "Colosseum" }] } };
+  const out = emitText(t);
+  assert.ok(!/google\.com\/maps/.test(out), out);
+  assert.ok(!/\[map\]/.test(out), out);
+  // and what does belong to the doc is untouched.
+  assert.match(out, /\* Hotel: \[Hotel Lancelot\]\(https:\/\/www\.lancelothotel\.com\/\)/);
+});
+
 ok("and it reads back the hotel address it just wrote", () => {
   const parsed = parseDocText([
     "Italy, October 2026",
